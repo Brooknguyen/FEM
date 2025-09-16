@@ -240,6 +240,7 @@ function bindAuthEvents(initialTab = "login") {
         code: res.user.code,
         firstName: res.user.firstName,
         lastName: res.user.lastName,
+        role: res.user.role,
       };
       const storage = remember ? localStorage : sessionStorage;
       storage.setItem("user_info", JSON.stringify(userInfo));

@@ -21,6 +21,15 @@ export function navigate(path) {
   location.hash = path;
 }
 
+function getUserRole() {
+  try {
+    const user = JSON.parse(sessionStorage.getItem("user_info"));
+    return user?.role || null;
+  } catch {
+    return null;
+  }
+}
+
 export function renderRoute() {
   const path = currentPath();
   const main = document.getElementById("main");
@@ -30,6 +39,8 @@ export function renderRoute() {
   const isRegister = path === "/register";
   const isForgot = path === "/forgot";
   const authed = isAuthed();
+
+  const role = getUserRole();
 
   // Cho phép vào /login & /register khi chưa đăng nhập
   if (!isLogin && !isRegister && !isForgot && !authed) {
@@ -85,10 +96,20 @@ export function renderRoute() {
     return;
   }
   if (path === "/crud/info") {
+    if (role !== "admin") {
+      alert("Access denied. Only admins can update information.");
+      navigate("/info/air");
+      return;
+    }
     main.innerHTML = renderCrudInfo();
     return;
   }
   if (path === "/crud/plan") {
+    if (role !== "admin") {
+      alert("Access denied. Only admins can update maintenance plans.");
+      navigate("/info/air");
+      return;
+    }
     main.innerHTML = renderCrudPlan();
     return;
   }

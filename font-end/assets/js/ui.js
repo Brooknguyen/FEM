@@ -150,7 +150,7 @@ export function renderUserProfilePopup() {
   return `
     <div class="user-profile-popup" id="user-profile-popup">
       <div class="profile-header">
-        <span style="color = #333" >User Profile</span>
+        <span style="color = #333" >${user?.role?.toUpperCase()} PROFILE</span>
         <button class="close-btn" id="close-profile-popup">&times;</button>
       </div>
       <div class="profile-body">
@@ -162,6 +162,7 @@ export function renderUserProfilePopup() {
           <div class="profile-value">${user?.code || ""}</div>
         </div>
       </div>
+          
       <div class="profile-footer">
         <button class="btn btn-logout" id="btn-logout-popup"><span class="i-exit"></span> Logout</button>
       </div>
