@@ -1,0 +1,215 @@
+.avatar.user-menu {
+  position: relative;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #f3f4f6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow 0.18s;
+}
+
+.avatar.user-menu img {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  border: none;
+}
+
+.avatar.user-menu:hover {
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.10);
+}
+
+/* Overlay nền mờ khi popup mở */
+.profile-popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(30, 41, 59, 0.18);
+  z-index: 9998;
+  backdrop-filter: blur(2px);
+}
+
+/* Popup chính */
+.user-profile-popup {
+  position: fixed;
+  top: 56px;
+  right: 40px;
+  width: 340px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(30, 41, 59, 0.18), 0 1.5px 8px rgba(30, 41, 59, 0.08);
+  z-index: 9999;
+  overflow: hidden;
+  animation: fadeIn 0.22s cubic-bezier(.4, 0, .2, 1);
+  font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+  color: #222;
+  border: 0.2px solid #e5e7eb;
+}
+
+/* Hiệu ứng fade in */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Header popup */
+.profile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 24px 8px 24px;
+  font-weight: 600;
+  font-size: 17px;
+  border-bottom: 1px solid #f3f4f6;
+  background: #f9fafb;
+  letter-spacing: 0.01em;
+}
+
+.user-profile-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  color: #64748b;
+  transition: color 0.18s;
+}
+
+.close-btn:hover {
+  color: #2563eb;
+}
+
+/* Thân popup */
+.profile-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 28px 24px 12px 24px;
+  text-align: center;
+  background: #fff;
+}
+
+.profile-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #f3f4f6;
+  object-fit: cover;
+  box-shadow: 0 2px 8px rgba(30, 41, 59, 0.07);
+  margin-bottom: 14px;
+  border: none;
+}
+
+.profile-center-info {
+  margin-top: 8px;
+}
+
+.profile-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: #222;
+  margin-bottom: 4px;
+  letter-spacing: 0.01em;
+}
+
+.profile-role {
+  font-size: 15px;
+  color: #2563eb;
+  margin-bottom: 2px;
+  font-weight: 500;
+}
+
+.profile-location {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 2px;
+}
+
+.profile-label {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 2px;
+  margin-bottom: 2px;
+  font-weight: 500;
+}
+
+.profile-value {
+  font-size: 16px;
+  margin-bottom: 8px;
+  color: #222;
+  font-weight: 600;
+}
+
+/* Footer chứa nút */
+.profile-footer {
+  padding: 18px 24px 24px 24px;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #f9fafb;
+}
+
+/* Nút Cài đặt */
+.btn-setting {
+  width: 100%;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  padding: 12px 0;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+  transition: background 0.18s, box-shadow 0.18s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-setting:hover {
+  background: #1d4ed8;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.12);
+}
+
+/* Nút Đăng xuất */
+.btn-logout {
+  width: 100%;
+  background: #fff;
+  color: #f00707;
+  border: 1px solid #f70404;
+  padding: 12px 0;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-logout:hover {
+  background: #f60303;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.10);
+}

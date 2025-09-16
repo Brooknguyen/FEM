@@ -42,9 +42,6 @@ app.get("/api/admin/secret", auth("admin"), (req, res) => {
   res.json({ secret: "only-for-admins", user: req.user });
 });
 
-
-
-
 // --- routes ---
 app.use("/api/auth", authRouter);
 // --- start ---
@@ -53,8 +50,8 @@ const MONGODB_URI = process.env.MONGODB_URI;
 
 connectDB(MONGODB_URI)
   .then(() => {
-    app.listen(PORT, () => {
-      console.log(`[API] Listening on :${PORT}`);
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`[API] Listening on 0.0.0.0:${PORT}`);
     });
   })
   .catch((err) => {

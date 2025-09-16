@@ -28,23 +28,27 @@ export function renderRoute() {
 
   const isLogin = path === "/login";
   const isRegister = path === "/register";
+  const isForgot = path === "/forgot";
   const authed = isAuthed();
 
   // Cho phép vào /login & /register khi chưa đăng nhập
-  if (!isLogin && !isRegister && !authed) {
+  if (!isLogin && !isRegister && !isForgot && !authed) {
     navigate("/login");
     return;
   }
   // Nếu đã đăng nhập thì không cho vào /login & /register
-  if ((isLogin || isRegister) && authed) {
+  if ((isLogin || isRegister || isForgot) && authed) {
     navigate("/info/air");
     return;
   }
 
-  document.body.classList.toggle("no-chrome", isLogin || isRegister);
+  document.body.classList.toggle(
+    "no-chrome",
+    isLogin || isRegister || isForgot
+  );
 
   // Bỏ highlight menu ở login & register
-  if (!isLogin && !isRegister) {
+  if (!isLogin && !isRegister && !isForgot) {
     document.querySelectorAll(".side-link, .side-sublink").forEach((a) => {
       a.classList.toggle("active", a.getAttribute("href") === `#${path}`);
     });
@@ -59,6 +63,12 @@ export function renderRoute() {
   if (isRegister) {
     main.innerHTML = renderRegister();
     bindRegisterEvents(); // <-- đã gọi OK
+    return;
+  }
+
+  if (isForgot) {
+    main.innerHTML = renderLogin();
+    bindLoginEvents();
     return;
   }
 

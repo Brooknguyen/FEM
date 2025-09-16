@@ -1,7 +1,9 @@
+//back-end /src/routes/auth.js
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { User } from "../models/User.js";
+import { sendOtpMail } from "../utils/mailer.js";
 
 const router = Router();
 
@@ -22,6 +24,7 @@ function signRefreshToken(user) {
   );
 }
 
+// RESGISTER
 // POST /api/auth/register
 router.post("/register", async (req, res) => {
   try {
@@ -31,7 +34,8 @@ router.post("/register", async (req, res) => {
     }
 
     const exists = await User.findOne({ code });
-    if (exists) return res.status(409).json({ message: "Employee code already exists" });
+    if (exists)
+      return res.status(409).json({ message: "Employee code already exists" });
 
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await User.create({
@@ -39,7 +43,7 @@ router.post("/register", async (req, res) => {
       firstName,
       lastName,
       passwordHash,
-      role: role && ["user","admin"].includes(role) ? role : "user",
+      role: role && ["user", "admin"].includes(role) ? role : "user",
     });
 
     // cấp token ngay sau đăng ký (tùy)
@@ -68,14 +72,19 @@ router.post("/register", async (req, res) => {
 router.post("/login", async (req, res) => {
   try {
     const { code, password } = req.body || {};
+    console.log("[login] code:", code); // Add this
     if (!code || !password) {
       return res.status(400).json({ message: "Missing code or password" });
     }
 
     const user = await User.findOne({ code });
+    console.log("[login] user found:", !!user); // Add this
     if (!user) return res.status(401).json({ message: "Invalid credentials" });
 
-    const ok = await bcrypt.compare(password, user.passwordHash);
+    const hash = user.passwordHash || user.passwordHash;
+    const ok = await bcrypt.compare(password, hash);
+
+    console.log("[login] password match:", ok); // Add this
     if (!ok) return res.status(401).json({ message: "Invalid credentials" });
 
     const accessToken = signAccessToken(user);
@@ -103,7 +112,8 @@ router.post("/login", async (req, res) => {
 router.post("/refresh", async (req, res) => {
   try {
     const { refreshToken } = req.body || {};
-    if (!refreshToken) return res.status(400).json({ message: "Missing refreshToken" });
+    if (!refreshToken)
+      return res.status(400).json({ message: "Missing refreshToken" });
 
     const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     if (payload.typ !== "refresh") throw new Error("Invalid token type");
@@ -121,7 +131,85 @@ router.post("/refresh", async (req, res) => {
     });
   } catch (err) {
     console.error("[refresh]", err);
-    return res.status(401).json({ message: "Invalid or expired refresh token" });
+    return res
+      .status(401)
+      .json({ message: "Invalid or expired refresh token" });
+  }
+});
+
+// ===== FORGOT PASSWORD (send OTP) =====
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ message: "Employee code is required" });
+    }
+    const user = await User.findOne({ code });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.resetOtp = otp;
+    user.resetOtpExp = new Date(
+      Date.now() + (parseInt(process.env.RESET_OTP_TTL_MIN, 10) || 10) * 60000
+    );
+    await user.save();
+
+    // Gửi OTP đến email admin hoặc user
+    await sendOtpMail(
+      process.env.MAIL_USERGET || "nguyenbrook0412@gmail.com",
+      code,
+      otp,
+      `${user.firstName} ${user.lastName}`
+    );
+
+    const devMode = process.env.NODE_ENV !== "production";
+    if (devMode) {
+      return res.json({
+        message: "OTP sent to admin email",
+        otp: otp,
+        expiresInMinutes: parseInt(process.env.RESET_OTP_TTL_MIN, 10) || 10,
+      });
+    } else {
+      return res.json({
+        message: "OTP sent to email if exists",
+      });
+    }
+  } catch (e) {
+    console.error("[forgot-password error]", e);
+    res.status(500).json({ message: "Server error: " + e.message });
+  }
+});
+
+// ===== RESET PASSWORD =====
+router.post("/reset-password", async (req, res) => {
+  try {
+    const { code, otp, newPassword } = req.body || {};
+    if (!code || !otp || !newPassword) {
+      return res.status(400).json({ message: "Missing data" });
+    }
+
+    const user = await User.findOne({ code });
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    if (!user.resetOtp || !user.resetOtpExp) {
+      return res.status(400).json({ message: "OTP not requested" });
+    }
+    if (user.resetOtp !== otp || new Date() > user.resetOtpExp) {
+      return res.status(400).json({ message: "OTP invalid or expired" });
+    }
+
+    // ✅ LƯU ĐÚNG FIELD
+    user.passwordHash = await bcrypt.hash(newPassword, 12);
+
+    user.resetOtp = undefined;
+    user.resetOtpExp = undefined;
+    await user.save();
+    console.log("Password updated for", user.code, user.passwordHash); // Log added
+
+    res.json({ message: "Password reset success" });
+  } catch (e) {
+    console.error("[reset-password]", e);
+    res.status(500).json({ message: "Server error" });
   }
 });
 
@@ -130,7 +218,9 @@ router.get("/me", async (req, res) => {
   try {
     // middleware auth sẽ xử lý ở server.js (gắn trước khi vào route này)
     // nhưng để endpoint này độc lập, ta parse nhanh tại đây nếu muốn:
-    return res.status(400).json({ message: "Mount this under auth middleware" });
+    return res
+      .status(400)
+      .json({ message: "Mount this under auth middleware" });
   } catch {
     return res.status(500).json({ message: "Server error" });
   }

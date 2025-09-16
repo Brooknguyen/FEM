@@ -1,10 +1,10 @@
-body{
+body {
   margin: 0;
   padding: 0;
-  width: 1920px;
-  height: 1080px;
-  overflow: hidden; /* ẩn scroll */
-
+  width: 100vw;
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto; /* Cho phép cuộn dọc */
 }
 
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--primary);color:#fff}
@@ -137,9 +137,15 @@ body{
 
 /* ================== TOPBAR ================== */
 .topbar2{
-  position:sticky; top:0; z-index:40;
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  z-index:100;
   height:var(--topbar-h);
-  display:flex; align-items:center; justify-content:space-between;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
   padding:0 12px;
   background:var(--card);
   color:var(--fg);
@@ -160,7 +166,7 @@ body{
 
 .branddot{
   width:28px; height:28px; border-radius:50%;
-  background:linear-gradient(135deg,#34a0ff,#6ee7b7);
+  background:transparent;
 }
 .divider-vert{ width:1px; height:24px; background:var(--line); }
 
@@ -183,7 +189,7 @@ body{
   position: fixed;
   top: var(--topbar-h);
   left: 0;
-  height: 1080px;
+  height: calc(100vh - var(--topbar-h));
   width: var(--sb-w);
   overflow-y: auto;
   background: var(--card);
@@ -216,7 +222,16 @@ body.dark-theme .side-item.active{ background:color-mix(in oklab, var(--primary)
 .i-bell   { mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M15 17h5l-1-2v-5a7 7 0 10-14 0v5l-1 2h5m4 0v1a3 3 0 11-6 0v-1" stroke="black" stroke-width="2" fill="none"/></svg>'); }
 .i-chat   { mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 15a4 4 0 01-4 4H7l-4 4V7a4 4 0 014-4h10a4 4 0 014 4z" stroke="black" stroke-width="2" fill="none"/></svg>'); }
 .i-help   { mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.1 9a3 3 0 115.8 1c0 2-3 2-3 4" stroke="black" stroke-width="2" fill="none"/><circle cx="12" cy="19" r="1" fill="black"/></svg>'); }
-.i-flag   { mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M5 3v18M5 4h9l-1 3h6v8h-9l1-3H5z" stroke="black" stroke-width="2" fill="none"/></svg>'); }
+.i-flag {
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+  background-image: url('../pictures/Flag.svg');
+  background-size: cover;       /* Chiếm hết khung */
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: 4px;           /* Bo nhẹ cho đẹp */
+}
 .i-home   { mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 10l9-7 9 7v10a2 2 0 0 1-2 2h-5V12H10v10H5a2 2 0 0 1-2-2z" stroke="black" stroke-width="2" fill="none"/></svg>'); }
 .i-system { mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="black" stroke-width="2" fill="none"/><path d="M12 3v18M3 12h18" stroke="black" stroke-width="2"/></svg>'); }
 .i-report { mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7 3h10v4h4v14H3V3h4z" stroke="black" stroke-width="2" fill="none"/><path d="M7 3v4h10" stroke="black" stroke-width="2"/></svg>'); }
@@ -230,8 +245,11 @@ body.dark-theme .side-item.active{ background:color-mix(in oklab, var(--primary)
 
 /* ================== CONTENT LAYOUT ================== */
 #main{
-  padding:16px;
-  margin-left:var(--sb-w);
+  margin-left: var(--sb-w);
+  margin-top: var(--topbar-h);
+  height: calc(100vh - var(--topbar-h));
+  overflow: auto;
+  padding: 16px;
   transition: margin-left .2s ease;
 }
 
@@ -287,6 +305,70 @@ body.no-chrome #header,
 body.no-chrome #footer,
 body.no-chrome .sidebar2 { display:none; }
 body.no-chrome #main{ margin-left:0; padding:0; }
+/* ================== SCROLLBAR STYLES ================== */
+
+/* Áp dụng cho toàn trang và các khối có cuộn */
+body, .scroll, .table-wrap, #main {
+  /* Firefox support */
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) var(--card);
+}
+
+/* WebKit Browsers (Chrome, Safari, Edge) */
+body::-webkit-scrollbar,
+.scroll::-webkit-scrollbar,
+.table-wrap::-webkit-scrollbar,
+#main::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+body::-webkit-scrollbar-track,
+.scroll::-webkit-scrollbar-track,
+.table-wrap::-webkit-scrollbar-track,
+#main::-webkit-scrollbar-track {
+  background: var(--card);
+}
+
+body::-webkit-scrollbar-thumb,
+.scroll::-webkit-scrollbar-thumb,
+.table-wrap::-webkit-scrollbar-thumb,
+#main::-webkit-scrollbar-thumb {
+  background-color: var(--line);
+  border-radius: 6px;
+  border: 2px solid var(--card);
+}
+
+body::-webkit-scrollbar-thumb:hover,
+.scroll::-webkit-scrollbar-thumb:hover,
+.table-wrap::-webkit-scrollbar-thumb:hover,
+#main::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted);
+}
+
+/* ================== DARK THEME SCROLLBAR ================== */
+body.dark-theme::-webkit-scrollbar-track,
+body.dark-theme .scroll::-webkit-scrollbar-track,
+body.dark-theme .table-wrap::-webkit-scrollbar-track,
+body.dark-theme #main::-webkit-scrollbar-track {
+  background: var(--card);
+}
+
+body.dark-theme::-webkit-scrollbar-thumb,
+body.dark-theme .scroll::-webkit-scrollbar-thumb,
+body.dark-theme .table-wrap::-webkit-scrollbar-thumb,
+body.dark-theme #main::-webkit-scrollbar-thumb {
+  background-color: var(--line);
+  border: 2px solid var(--card);
+}
+
+body.dark-theme::-webkit-scrollbar-thumb:hover,
+body.dark-theme .scroll::-webkit-scrollbar-thumb:hover,
+body.dark-theme .table-wrap::-webkit-scrollbar-thumb:hover,
+body.dark-theme #main::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted);
+}
+
 
 
 

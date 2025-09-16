@@ -4,6 +4,9 @@ import { renderHeader, renderSidebar } from "./ui.js";
 import { InfoStore as Info } from "./stores/info.store.js";
 
 window.navigate = navigate;
+window.render = renderRoute;
+
+window.addEventListener("load", renderRoute);
 
 function isInfoPath(hash) {
   return (hash || location.hash).startsWith("#/info/");
@@ -67,3 +70,13 @@ window.toggleSubmenu = (el) => {
   const ul = el.parentElement.querySelector(".submenu");
   ul?.classList.toggle("hidden");
 };
+window.addEventListener("input", function (e) {
+  if (e.target.id === "global-search") {
+    const keyword = e.target.value.toLowerCase().trim();
+
+    // Gọi hàm lọc dữ liệu (giả sử bạn có biến Info)
+    if (Info.filterItems) {
+      Info.filterItems(keyword);
+    }
+  }
+});
