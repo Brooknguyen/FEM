@@ -8,15 +8,15 @@ const TANK_STATE = { sheetName: "", rows: [], merges: [] };
 const FREEZE_HEADER_ROWS = 2; // số hàng header cố định
 const FREEZE_FIRST_COL = false; // nếu muốn cố định cột đầu -> true
 
-export function renderExhaustPage() {
+export function renderAirPage() {
   return `
   <section class="card">
     <div class="card-h">
-      <div class="title"><span class="title-lg">Danh mục thiết bị Utility —  Exhaust Fan</span></div>
+      <div class="title"><span class="title-lg">Danh mục thiết bị Utility —  Air & N2 systems</span></div>
     </div>
 
     <div class="p-4">
-      ${renderInfoTabs("exhaust")}
+      ${renderInfoTabs("air")}
 
       <div class="toolbar" style="margin:8px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input type="file" id="tnk-file" accept=".xlsx,.xls" style="display:none" />
@@ -102,7 +102,7 @@ export function renderExhaustPage() {
   `;
 }
 
-export function bindExhaustEvents() {
+export function bindAirEvents() {
   const fileInput = document.getElementById("tnk-file");
   const btnImport = document.getElementById("tnk-import");
   const btnExport = document.getElementById("tnk-export");

@@ -7,6 +7,7 @@ dotenv.config();
 
 import { connectDB } from "./db.js";
 import authRouter from "./routes/auth.js";
+import tankRouter from "./routes/tank.js";
 import { auth } from "./middleware/auth.js";
 
 const app = express();
@@ -45,6 +46,9 @@ app.get("/api/admin/secret", auth("admin"), (req, res) => {
 // --- routes ---
 app.use("/api/auth", authRouter);
 // --- start ---
+
+// ---Pressure Tank----
+app.use("/api/tanks", tankRouter);
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI;
 

@@ -1,4 +1,3 @@
-//auth.service.js
 const API_BASE = "http://10.100.201.25:4000/api";
 
 async function apiFetch(path, opts = {}) {

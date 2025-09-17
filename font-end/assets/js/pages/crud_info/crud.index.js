@@ -6,7 +6,7 @@ import { renderCompressorPage, bindCompressorEvents } from "./compressor.js";
 import { renderAHUPage, bindAhuEvents } from "./ahu.js";
 import { renderChillerPage, bindChillerEvents } from "./chiller.js";
 import { renderExhaustPage, bindExhaustEvents } from "./exhaust.js";
-import { renderACPage, bindACEvents } from "./ac.js";
+import { renderACPage, bindACEvents } from "./crud-ac.js";
 import { renderTankPage, bindTankEvents } from "./tank.js";
 
 export function renderInfoRoute(path) {

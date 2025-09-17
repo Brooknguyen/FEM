@@ -1,0 +1,119 @@
+/* Khi body ở dark theme */
+body.dark-theme .table-freeze th,
+body.dark-theme .table-freeze td {
+  background: #1f2937;
+  color: #fff;
+  border: 1px solid #374151;
+}
+
+/* Các phần còn lại */
+.table-wrap {
+  max-height: 74vh;
+  overflow: auto;
+  width: 100%;
+  border-right: 1px solid #374151;
+  border-bottom: 1px solid #374151;
+  background: var(--card, #1f2937);
+  padding: 0;
+}
+
+.table-freeze {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 15px;
+  background: var(--card, #1f2937);
+}
+
+.table-freeze th,
+.table-freeze td {
+  min-width: 120px;
+  padding: 10px 12px;
+  border: 1px solid #374151;
+  white-space: nowrap;
+  text-align: center;
+  vertical-align: middle;
+  background: #232b36;
+  color: #fff;
+  font-weight: 500;
+  transition: background 0.15s;
+}
+
+.table-freeze thead th {
+  position: sticky;
+  z-index: 2;
+  background: #293042;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  border-bottom: 2px solid #2563eb;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+}
+
+.table-freeze thead tr:nth-child(1) th {
+  top: 0;
+  z-index: 12;
+}
+
+.table-freeze thead tr:nth-child(2) th {
+  top: 44px; /* đúng bằng chiều cao hàng 1 */
+  z-index: 11;
+}
+
+.table-freeze tr:nth-child(even) td {
+  background: #232b36;
+}
+.table-freeze tr:nth-child(odd) td {
+  background: #1f2937;
+}
+
+.table-freeze tr:hover td {
+  background: #334155;
+  color: #fff;
+}
+
+/* Freeze 7 cột đầu bảng */
+.table-freeze th.freeze-col-0, .table-freeze td.freeze-col-0 { position: sticky; left: 0;    z-index: 21; background: #1e293b; }
+.table-freeze th.freeze-col-1, .table-freeze td.freeze-col-1 { position: sticky; left: 120px;  z-index: 21; background: #1e293b; }
+.table-freeze th.freeze-col-2, .table-freeze td.freeze-col-2 { position: sticky; left: 240px;  z-index: 21; background: #1e293b; }
+.table-freeze th.freeze-col-3, .table-freeze td.freeze-col-3 { position: sticky; left: 360px;  z-index: 21; background: #1e293b; }
+.table-freeze th.freeze-col-4, .table-freeze td.freeze-col-4 { position: sticky; left: 480px;  z-index: 21; background: #1e293b; }
+.table-freeze th.freeze-col-5, .table-freeze td.freeze-col-5 { position: sticky; left: 600px;  z-index: 21; background: #1e293b; }
+.table-freeze th.freeze-col-6, .table-freeze td.freeze-col-6 { position: sticky; left: 720px; z-index: 21; background: #1e293b; }
+
+  #tnk-preview table{ border-collapse:collapse; width:max-content; background:var(--card); color:var(--fg) }
+  #tnk-preview th,#tnk-preview td{ border:1px solid var(--line); padding:10px 12px; white-space:nowrap; line-height:1.5; }
+  #tnk-preview thead th{
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: #f1f5f9;     /* nền header ở theme sáng */
+    color: var(--fg);
+    border-bottom: 1px solid var(--line);
+  }
+  body.dark-theme #tnk-preview thead th{
+    background:#1f2937;      /* nền header ở theme tối */
+  }
+
+  #tnk-preview{
+    max-height: 72vh;
+    overflow:auto;
+    border:1px solid var(--line);
+    border-radius: 10px;
+    background: var(--card);
+  }
+  #tnk-preview table{
+    border-collapse:collapse;
+    width:max-content;
+    background:var(--card);
+    color:var(--fg);
+  }
+  #tnk-preview th,#tnk-preview td{
+    border:1px solid var(--line);
+    padding:10px 12px;          /* tăng chiều cao để dễ nhìn */
+    white-space:nowrap;
+    line-height:1.5;
+    box-sizing: border-box;
+  }
+

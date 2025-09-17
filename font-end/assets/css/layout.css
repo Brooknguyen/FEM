@@ -76,7 +76,7 @@ body.dark-theme .tab.active {
 
 .table-wrap{border-top:1px solid var(--line)}
 table{width:100%;border-collapse:separate;border-spacing:0}
-thead th{position:sticky;top:0;background:#f1f5f9;border-bottom:1px solid var(--line);z-index:1}
+thead th{position:sticky;top:0;background: var(--thead-bg);color: var(--fg);;border-bottom:1px solid var(--line);z-index:1}
 th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
 tfoot td{background:#f8fafc;font-weight:600}
 .right{text-align:right}
