@@ -1,7 +1,7 @@
 // main.js
 import { renderRoute, navigate } from "./router.js";
 import { renderHeader, renderSidebar } from "./ui.js";
-import { InfoStore as Info } from "./stores/info.store.js";
+
 
 window.navigate = navigate;
 
@@ -31,15 +31,8 @@ window.addEventListener("DOMContentLoaded", async () => {
     location.hash = isAuthed() ? "#/info/air" : "#/login";
   }
 
-  // Chỉ load dữ liệu khi đã login và đang ở /info/*
-  if (isAuthed() && isInfoPath()) {
-    const tab = getInfoTab();
-    if (Info.tab !== tab && Info.setTab) {
-      await Info.setTab(tab);
-    } else if (!Info.items?.length && Info.load) {
-      await Info.load();
-    }
-  }
+
+
 
   window.render();
 

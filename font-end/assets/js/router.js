@@ -9,7 +9,7 @@ import {
   renderRegister,
   bindLoginEvents,
   bindRegisterEvents,
-} from "./pages/login.js";
+} from "./login/login.js";
 
 const isAuthed = () => !!sessionStorage.getItem("auth_token");
 

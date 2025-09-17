@@ -1,17 +1,16 @@
-// Tabs điều hướng giữa các trang con của Info
+// assets/js/pages/info/tabs.js
+import { INFO_TABS } from "./config.js";
+
 export function renderInfoTabs(active) {
   const tab = (k, l) =>
-    `<a class="tab ${active === k ? "active" : ""}" href="#/info/${k}">${l}</a>`;
+    `<a class="tab ${
+      active === k ? "active" : ""
+    }" href="#/info/${k}">${l}</a>`;
+
   return `
   <div class="tabs">
     <div class="tabset">
-      ${tab("air",        "Air&N2 system")}
-      ${tab("compressor", "High Pressure Air Compressor")}
-      ${tab("ahu",        "AHU")}
-      ${tab("chiller",    "Water Chiller")}
-      ${tab("tank",       "Pressure Tank")}
-      ${tab("exhaust",    "Exhaust Fan")}
-      ${tab("ac",         "ACU + Aircon")}
+      ${INFO_TABS.map((t) => tab(t.key, t.label)).join("")}
     </div>
   </div>`;
 }

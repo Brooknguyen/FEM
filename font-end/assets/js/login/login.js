@@ -1,6 +1,6 @@
 // pages/login.js
 import { navigate } from "../router.js";
-import { login, register } from "../services/auth.service.js";
+import { login, register } from "./auth.service.js";
 
 /** ====== CẤU HÌNH API BACKEND ====== */
 const API_BASE = "http://10.100.201.25:4000/api"; // đổi theo môi trường của bạn
