@@ -8,7 +8,7 @@ export const FREEZE_HEADER_ROWS = 2; // số hàng header cố định
 export const FREEZE_FIRST_COL = false; // cố định cột đầu tiên hay không
 
 // Khai báo các resource: route key, tiêu đề trang, sheet mặc định, endpoint GET latest và POST save
-export const INFO_RESOURCES = {
+export const CRUD_INFO_RESOURCES = {
   air: {
     key: "air",
     title: "Danh mục thiết bị Utility — Air & N2 system",
@@ -75,7 +75,7 @@ export const INFO_RESOURCES = {
 };
 
 // Dùng để dựng thanh tabs (key + label giống file tabs cũ)
-export const INFO_TABS = [
+export const CRUD_INFO_TABS = [
   { key: "air", label: "Air&N2 system" },
   { key: "compressor", label: "High Pressure Air Compressor" },
   { key: "ahu", label: "AHU" },
@@ -85,4 +85,4 @@ export const INFO_TABS = [
   { key: "ac", label: "ACU + Aircon" },
 ];
 
-export const INFO_KEYS = new Set(INFO_TABS.map((t) => t.key));
+export const CRUD_INFO_KEYS = new Set(CRUD_INFO_TABS.map((t) => t.key));

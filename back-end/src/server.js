@@ -7,7 +7,7 @@ dotenv.config();
 
 import { connectDB } from "./db.js";
 import authRouter from "./routes/auth.js";
-import tankRouter from "./routes/tank.js";
+import deviceRouter from "./routes/device.js"; // <-- sửa tên import ở đây
 import { auth } from "./middleware/auth.js";
 
 const app = express();
@@ -17,8 +17,8 @@ app.use(helmet());
 app.use(express.json());
 
 // === CORS: mở cho tất cả origin ===
-app.use(cors()); // -> Access-Control-Allow-Origin: *
-app.options("*", cors()); // -> cho phép preflight OPTIONS mọi route
+app.use(cors());
+app.options("*", cors());
 
 app.set("trust proxy", 1);
 app.use(
@@ -35,7 +35,7 @@ app.get("/health", (_, res) => res.json({ ok: true }));
 
 // ví dụ route cần xác thực (đính kèm role, expires trong JWT)
 app.get("/api/profile", auth(), (req, res) => {
-  res.json({ message: "OK", user: req.user }); // { sub, code, role, iat, exp }
+  res.json({ message: "OK", user: req.user });
 });
 
 // ví dụ route chỉ admin mới vào
@@ -45,10 +45,11 @@ app.get("/api/admin/secret", auth("admin"), (req, res) => {
 
 // --- routes ---
 app.use("/api/auth", authRouter);
-// --- start ---
 
-// ---Pressure Tank----
-app.use("/api/tanks", tankRouter);
+// --- mount toàn bộ router device.js dưới /api/device ---
+// Giờ tất cả route: tank, airn2, ahu... sẽ nằm dưới đường dẫn /api/device/...
+app.use("/api/device", deviceRouter);
+
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI;
 

@@ -2,7 +2,7 @@
 import { renderInfoRoute } from "./pages/info/index.js"; // bộ điều phối /info/:tab
 import { renderPlan } from "./pages/plan.js";
 import { renderReport } from "./pages/report.js";
-import { renderCrudInfo } from "./pages/crud-info.js";
+import { renderCrudInfoRoute } from "./pages/crud_info/crud.index.js";
 import { renderCrudPlan } from "./pages/crud-plan.js";
 import {
   renderLogin,
@@ -99,12 +99,18 @@ export function renderRoute() {
   }
 
   if (path === "/crud/info") {
+    navigate("/crud_info/air");
+    return;
+  }
+
+  // 2) Bắt tất cả /crud_info/:tab
+  if (path.startsWith("/crud_info/")) {
     if (role !== "admin") {
       alert("Access denied. Admins only.");
       navigate("/info/air");
       return;
     }
-    main.innerHTML = renderCrudInfo();
+    main.innerHTML = renderCrudInfoRoute(path);
     return;
   }
 

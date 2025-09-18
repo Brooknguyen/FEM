@@ -1,5 +1,5 @@
 // table-advanced.js
-import { renderInfoTabs } from "./tabs.js";
+import { renderCrudInfoTabs } from "./crud.tabs.js";
 
 export function renderAdvancedTable({ title, active, headerRows, rows }) {
   // Tạo các dòng <tr> cho thead từ headerRows
@@ -42,7 +42,7 @@ export function renderAdvancedTable({ title, active, headerRows, rows }) {
   <section class="card">
     <div class="card-h"><div class="title"><span class="title-lg">${title}</span></div></div>
     <div class="p-4">
-      ${renderInfoTabs(active)}
+      ${renderCrudInfoTabs(active)}
       <div class="table-wrapper">
         <table id="grid" class="table-adv">
           <thead>${thead}</thead>
