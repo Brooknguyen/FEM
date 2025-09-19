@@ -268,7 +268,7 @@ body.is-collapsed .side-item .label{ display:none; }
 
 table{ width:max-content; min-width:100%; border-collapse:separate; border-spacing:0; }
 .table-adv thead th{ background:color-mix(in oklab, var(--line), var(--card) 35%); text-align:center; vertical-align:middle; }
-.table-adv th, .table-adv td{ padding:10px 12px; border-bottom:1px solid var(--line); color:var(--fg); white-space:nowrap; }
+.table-adv th, .table-adv td{ padding:10px 12px; border-bottom:1px solid var(--line); color:var(--fg); white-space:pre-wrap; }
 .tr-section td{ background:color-mix(in oklab, var(--primary), var(--card) 80%); color:var(--fg); font-weight:700; }
 
 /* badges / chips (nếu có) */

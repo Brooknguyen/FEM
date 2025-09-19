@@ -8,6 +8,7 @@ dotenv.config();
 import { connectDB } from "./db.js";
 import authRouter from "./routes/auth.js";
 import deviceRouter from "./routes/device.js"; // <-- sửa tên import ở đây
+import maintanceRouter from "./routes/maintenance.js";
 import { auth } from "./middleware/auth.js";
 
 const app = express();
@@ -49,6 +50,9 @@ app.use("/api/auth", authRouter);
 // --- mount toàn bộ router device.js dưới /api/device ---
 // Giờ tất cả route: tank, airn2, ahu... sẽ nằm dưới đường dẫn /api/device/...
 app.use("/api/device", deviceRouter);
+
+//route maintenance
+app.use("/api/maintenance", maintanceRouter);
 
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI;

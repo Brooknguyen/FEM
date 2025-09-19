@@ -1,9 +1,9 @@
 // router.js
 import { renderInfoRoute } from "./pages/info/index.js"; // bộ điều phối /info/:tab
-import { renderPlan } from "./pages/plan.js";
+import { renderPlanRoute } from "./pages/plan/index_plan.js"; // bộ điều phối /plan/:tab
 import { renderReport } from "./pages/report.js";
 import { renderCrudInfoRoute } from "./pages/crud_info/crud.index.js";
-import { renderCrudPlan } from "./pages/crud-plan.js";
+import { renderCrudPlanRoute } from "./pages/crud_plan/crud.index.plan.js";
 import {
   renderLogin,
   renderRegister,
@@ -88,16 +88,6 @@ export function renderRoute() {
     return;
   }
 
-  if (path === "/plan") {
-    main.innerHTML = renderPlan();
-    return;
-  }
-
-  if (path === "/report") {
-    main.innerHTML = renderReport();
-    return;
-  }
-
   if (path === "/crud/info") {
     navigate("/crud_info/air");
     return;
@@ -114,13 +104,28 @@ export function renderRoute() {
     return;
   }
 
+  if (path.startsWith("/plan/")) {
+    main.innerHTML = renderPlanRoute(path);
+    return;
+  }
+
   if (path === "/crud/plan") {
+    navigate("/crud_plan/electric");
+    return;
+  }
+
+  if (path.startsWith("/crud_plan/")) {
     if (role !== "admin") {
       alert("Access denied. Admins only.");
-      navigate("/info/air");
+      navigate("/plan/electric");
       return;
     }
-    main.innerHTML = renderCrudPlan();
+    main.innerHTML = renderCrudPlanRoute(path);
+    return;
+  }
+
+  if (path === "/report") {
+    main.innerHTML = renderReport();
     return;
   }
 

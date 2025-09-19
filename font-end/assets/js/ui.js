@@ -17,10 +17,7 @@ export function renderHeader() {
         <img src="assets/pictures/icon_company.png" alt="avatar">
       </div>
       <div class="divider-vert"></div>
-      <div class="searchbar2">
-        <span class="i-search"></span>
-        <input id="global-search" placeholder="Search" />
-      </div>
+      
     </div>
 
     <div class="right">
@@ -71,7 +68,7 @@ export function renderSidebar() {
   return `
   <aside class="sidebar2" id="app-sidebar">
     ${item("#/info/air", "i-home", "Thông tin")}
-    ${item("#/plan", "i-system", "Kế hoạch bảo dưỡng")}
+    ${item("#/plan/electric", "i-system", "Kế hoạch bảo dưỡng")}
 
     <!-- Cài đặt có submenu -->
     <div class="side-group">

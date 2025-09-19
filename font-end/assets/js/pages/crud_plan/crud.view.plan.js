@@ -1,11 +1,11 @@
 // assets/js/pages/info/view.js
 import {
-  CRUD_INFO_RESOURCES,
-  CRUD_INFO_KEYS,
+  CRUD_PLAN_RESOURCES,
+  CRUD_PLAN_KEYS,
   FREEZE_FIRST_COL,
   FREEZE_HEADER_ROWS,
-} from "./crud.config.js";
-import { renderCrudInfoTabs } from "./crud.tabs.js";
+} from "./crud.config.plan.js";
+import { renderCrudPlanTabs } from "./crud.tabs.plan.js";
 
 // ===== State chung cho mọi trang =====
 const STATE = {
@@ -112,8 +112,8 @@ function adjustFreezeOffsets(previewEl) {
 }
 
 // ===== View/Bind dùng lại =====
-export function renderCrudInfoPage(key) {
-  const cfg = CRUD_INFO_RESOURCES[key];
+export function renderCrudPlanPage(key) {
+  const cfg = CRUD_PLAN_RESOURCES[key];
   const ids = {
     file: `${key}-file`,
     import: `${key}-import`,
@@ -135,7 +135,7 @@ export function renderCrudInfoPage(key) {
     </div>
 
     <div class="p-4">
-      ${renderCrudInfoTabs(key)}
+      ${renderCrudPlanTabs(key)}
       <div class="toolbar" style="margin:8px 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input type="file" id="${
           ids.file
@@ -194,9 +194,9 @@ export function renderCrudInfoPage(key) {
   </style>`;
 }
 
-export function bindCrudInfoEvents(key) {
-  if (!CRUD_INFO_KEYS.has(key)) return;
-  const cfg = CRUD_INFO_RESOURCES[key];
+export function bindCrudPlanEvents(key) {
+  if (!CRUD_PLAN_KEYS.has(key)) return;
+  const cfg = CRUD_PLAN_RESOURCES[key];
 
   const fileInput = document.getElementById(`${key}-file`);
   const btnImport = document.getElementById(`${key}-import`);
@@ -204,9 +204,33 @@ export function bindCrudInfoEvents(key) {
   const btnSave = document.getElementById(`${key}-save`);
   const tip = document.getElementById(`${key}-tip`);
   const preview = document.getElementById(`${key}-preview`);
-  const searchInput = document.getElementById(`${key}-search`);
-
+  const searchInput = document.getElementById(`${key}-search`); // lấy input search
   if (!fileInput) return;
+
+  let filteredRows = STATE.rows; // lưu mảng rows đã filter
+
+  // Hàm render bảng theo dữ liệu truyền vào (có thể là filtered)
+  function renderTable(rows) {
+    preview.innerHTML = renderMergedTable(
+      rows,
+      STATE.merges,
+      FREEZE_HEADER_ROWS
+    );
+    adjustFreezeOffsets(preview);
+    tip.textContent = `Sheet: ${STATE.sheetName} — ${rows.length} hàng × ${
+      (rows[0] || []).length
+    } cột. Merge: ${STATE.merges.length}`;
+  }
+
+  // Hàm lọc dữ liệu theo từ khóa search
+  function filterRows(keyword) {
+    if (!keyword) return STATE.rows;
+    const kw = keyword.toLowerCase();
+    // Lọc những hàng mà có ít nhất một ô chứa từ khóa
+    return STATE.rows.filter((row) =>
+      row.some((cell) => String(cell).toLowerCase().includes(kw))
+    );
+  }
 
   // ===== Auto load latest khi vào trang =====
   loadLatestAndRender(cfg.defaultSheet).catch((e) => {
@@ -217,75 +241,7 @@ export function bindCrudInfoEvents(key) {
     btnSave.disabled = true;
   });
 
-  // ===== Import Excel =====
-  btnImport.onclick = () => fileInput.click();
-  fileInput.onchange = async (ev) => {
-    const file = ev.target.files?.[0];
-    if (!file) return;
-    try {
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
-      const wsName = wb.SheetNames[0];
-      const ws = wb.Sheets[wsName];
-      const { matrix, merges } = sheetToMatrixAndMerges(ws);
-
-      STATE.sheetName = wsName;
-      STATE.rows = matrix;
-      STATE.merges = merges;
-
-      preview.innerHTML = renderMergedTable(matrix, merges, FREEZE_HEADER_ROWS);
-      tip.textContent = `Sheet: ${wsName} — ${matrix.length} hàng × ${
-        (matrix[0] || []).length
-      } cột. Merge: ${merges.length}`;
-      adjustFreezeOffsets(preview);
-      btnExport.disabled = false;
-      btnSave.disabled = false;
-    } catch (e) {
-      console.error(e);
-      alert("Không đọc được file Excel");
-    } finally {
-      ev.target.value = "";
-      // reset search input khi import mới
-      if (searchInput) searchInput.value = "";
-    }
-  };
-
-  // ===== Export Excel =====
-  btnExport.onclick = () => {
-    if (!STATE.rows.length) return;
-    const ws = XLSX.utils.aoa_to_sheet(STATE.rows);
-    ws["!merges"] = STATE.merges;
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, STATE.sheetName || key.toUpperCase());
-    XLSX.writeFile(wb, `${key}_${STATE.sheetName || "sheet"}.xlsx`);
-  };
-
-  // ===== Save vào Mongo =====
-  btnSave.onclick = async () => {
-    if (!STATE.rows.length) return;
-    try {
-      const res = await fetch(cfg.postPath(), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sheetName: STATE.sheetName || cfg.defaultSheet,
-          rows: STATE.rows,
-          merges: STATE.merges,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "Lỗi lưu dữ liệu");
-      }
-      const data = await res.json();
-      alert("✅ Đã lưu vào Mongo! ID: " + data.id);
-    } catch (e) {
-      console.error(e);
-      alert("❌ Không lưu được: " + e.message);
-    }
-  };
-
-  // ===== Search bar logic =====
+  // ===== Search event =====
   if (searchInput) {
     searchInput.addEventListener("input", () => {
       const query = searchInput.value.trim().toLowerCase();
@@ -325,6 +281,71 @@ export function bindCrudInfoEvents(key) {
       adjustFreezeOffsets(preview);
     });
   }
+
+  // ===== Import Excel =====
+  btnImport.onclick = () => fileInput.click();
+  fileInput.onchange = async (ev) => {
+    const file = ev.target.files?.[0];
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const wsName = wb.SheetNames[0];
+      const ws = wb.Sheets[wsName];
+      const { matrix, merges } = sheetToMatrixAndMerges(ws);
+
+      STATE.sheetName = wsName;
+      STATE.rows = matrix;
+      STATE.merges = merges;
+
+      filteredRows = STATE.rows; // reset filter khi import file mới
+      if (searchInput) searchInput.value = "";
+
+      renderTable(filteredRows);
+      btnExport.disabled = false;
+      btnSave.disabled = false;
+    } catch (e) {
+      console.error(e);
+      alert("Không đọc được file Excel");
+    } finally {
+      ev.target.value = "";
+    }
+  };
+
+  // ===== Export Excel =====
+  btnExport.onclick = () => {
+    if (!STATE.rows.length) return;
+    const ws = XLSX.utils.aoa_to_sheet(STATE.rows);
+    ws["!merges"] = STATE.merges;
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, STATE.sheetName || key.toUpperCase());
+    XLSX.writeFile(wb, `${key}_${STATE.sheetName || "sheet"}.xlsx`);
+  };
+
+  // ===== Save vào Mongo =====
+  btnSave.onclick = async () => {
+    if (!STATE.rows.length) return;
+    try {
+      const res = await fetch(cfg.postPath(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sheetName: STATE.sheetName || cfg.defaultSheet,
+          rows: STATE.rows,
+          merges: STATE.merges,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Lỗi lưu dữ liệu");
+      }
+      const data = await res.json();
+      alert("✅ Đã lưu vào Mongo! ID: " + data.id);
+    } catch (e) {
+      console.error(e);
+      alert("❌ Không lưu được: " + e.message);
+    }
+  };
 
   // Recalc sticky offsets khi resize
   window.addEventListener("resize", () => adjustFreezeOffsets(preview), {
@@ -375,21 +396,11 @@ export function bindCrudInfoEvents(key) {
       return;
     }
 
-    preview.innerHTML = renderMergedTable(
-      STATE.rows,
-      STATE.merges,
-      FREEZE_HEADER_ROWS
-    );
-    tip.textContent = `Sheet: ${STATE.sheetName} — ${
-      STATE.rows.length
-    } hàng × ${(STATE.rows[0] || []).length} cột. Merge: ${
-      STATE.merges.length
-    }`;
-    adjustFreezeOffsets(preview);
+    filteredRows = STATE.rows; // reset filter khi load dữ liệu mới
+    if (searchInput) searchInput.value = "";
+
+    renderTable(filteredRows);
     btnExport.disabled = false;
     btnSave.disabled = false;
-
-    // reset search input khi load data mới
-    if (searchInput) searchInput.value = "";
   }
 }
