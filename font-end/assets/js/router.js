@@ -11,7 +11,9 @@ import {
   bindRegisterEvents,
 } from "./login/login.js";
 
-const isAuthed = () => !!sessionStorage.getItem("auth_token");
+const isAuthed = () =>
+  !!sessionStorage.getItem("auth_token") ||
+  !!localStorage.getItem("auth_token");
 
 export function currentPath() {
   return location.hash.replace(/^#/, "") || "/login";
@@ -23,7 +25,9 @@ export function navigate(path) {
 
 function getUserRole() {
   try {
-    const user = JSON.parse(sessionStorage.getItem("user_info"));
+    const user =
+      JSON.parse(sessionStorage.getItem("user_info")) ||
+      JSON.parse(localStorage.getItem("user_info"));
     return user?.role || null;
   } catch {
     return null;

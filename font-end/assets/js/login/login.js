@@ -174,6 +174,12 @@ function bindAuthEvents(initialTab = "login") {
     forgotForm.style.display = "none";
     if (location.hash !== "#/login") navigate("/login");
     document.getElementById("login-username")?.focus();
+
+    const rememberedCode = localStorage.getItem("remember_code") || "";
+    const rememberedPassword = localStorage.getItem("remember_password") || "";
+    document.getElementById("login-username").value = rememberedCode;
+    document.getElementById("login-password").value = rememberedPassword;
+    document.getElementById("remember").checked = !!rememberedCode;
   };
 
   const showRegister = () => {
@@ -235,15 +241,28 @@ function bindAuthEvents(initialTab = "login") {
     try {
       setLoading(btnLogin, true);
       const res = await login(code, password);
+
+      // Lưu token vào localStorage/sessionStorage tùy remember
       saveTokens(res.accessToken, res.refreshToken, remember);
+
+      // Lưu thông tin user_info
+      const storage = remember ? localStorage : sessionStorage;
       const userInfo = {
         code: res.user.code,
         firstName: res.user.firstName,
         lastName: res.user.lastName,
         role: res.user.role,
       };
-      const storage = remember ? localStorage : sessionStorage;
       storage.setItem("user_info", JSON.stringify(userInfo));
+
+      // Lưu username/password nếu remember tick (để auto-fill)
+      if (remember) {
+        localStorage.setItem("remember_code", code);
+        localStorage.setItem("remember_password", password);
+      } else {
+        localStorage.removeItem("remember_code");
+        localStorage.removeItem("remember_password");
+      }
 
       document.body.classList.remove("no-chrome");
       location.reload();
@@ -302,9 +321,10 @@ function bindAuthEvents(initialTab = "login") {
 
     try {
       setLoading(btnReg, true);
-      const res = await register({ code, password, firstName, lastName });
-      saveTokens(res.accessToken, res.refreshToken, true);
-      navigate("/info/air");
+      await register({ code, password, firstName, lastName });
+
+      alert("Register Succesfully! Please login! ");
+      navigate("/login");
     } catch (err) {
       errReg.textContent = getErrMsg(
         err,

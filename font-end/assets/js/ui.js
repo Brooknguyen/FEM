@@ -17,7 +17,6 @@ export function renderHeader() {
         <img src="assets/pictures/icon_company.png" alt="avatar">
       </div>
       <div class="divider-vert"></div>
-      
     </div>
 
     <div class="right">
