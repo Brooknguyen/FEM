@@ -58,6 +58,11 @@ const ACUSheetSchema = new mongoose.Schema(commonSheetFields, {
 });
 ACUSheetSchema.index({ sheetName: 1, createdAt: -1 });
 
+const SummarySheetSchema = new mongoose.Schema(commonSheetFields, {
+  timestamp: true,
+});
+SummarySheetSchema.index({ sheetName: 1, createdAt: -1 });
+
 // Tạo model và export
 const TankSheet = mongoose.model("TankSheet", TankSheetSchema);
 const AirN2Sheet = mongoose.model("AirN2Sheet", AirN2SheetSchema);
@@ -75,7 +80,7 @@ const ExhaustFanSheet = mongoose.model(
   ExhaustFanSheetSchema
 );
 const ACUSheet = mongoose.model("ACUSheet", ACUSheetSchema);
-
+const SummarySheet = mongoose.model("SummarySheet", SummarySheetSchema);
 export {
   TankSheet,
   AirN2Sheet,
@@ -84,4 +89,5 @@ export {
   WaterChillerSheet,
   ExhaustFanSheet,
   ACUSheet,
+  SummarySheet,
 };

@@ -1,0 +1,87 @@
+/* 2 hộp chart nằm ngang, tự xuống hàng khi màn nhỏ */
+.report-charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+
+/* Box từng biểu đồ */
+.chart-box {
+  width: 320px;                 /* chỉnh để to/nhỏ theo ý */
+  max-width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  background: transparent;
+  margin: 0 auto;
+}
+
+.chart-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 8px;
+  text-align: center;
+}
+
+/* Canvas size cho Chart.js (dùng !important để thắng inline style) */
+.chart-box canvas {
+  display: block;
+  width: 260px !important;
+  height: 260px !important;
+  margin: 0 auto;
+}
+
+/* Mobile: 1 cột và chart nhỏ hơn */
+@media (max-width: 768px) {
+  .report-charts { grid-template-columns: 1fr; }
+  .chart-box { width: 280px; }
+  .chart-box canvas {
+    width: 230px !important;
+    height: 230px !important;
+  }
+}
+
+/* Lưới 2 cột, tự xuống 1 cột khi màn hẹp */
+.report-charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  align-items: start;
+}
+
+/* Hộp biểu đồ: nền trắng nổi trên nền tối */
+.chart-box {
+  width: 320px;
+  max-width: 100%;
+  background: transparent;
+  margin: 0 auto;
+}
+
+.chart-title {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 2px 0 8px;
+  text-align: center;
+  color: white; /* đảm bảo đọc tốt trên nền trắng */
+}
+
+/* Ép kích thước canvas để Chart.js fit theo box */
+.chart-box canvas {
+  display: block;
+  width: 100% !important;
+  height: 260px !important;
+  margin: 0 auto;
+}
+
+/* Mobile: xếp 1 cột, chart nhỏ lại */
+@media (max-width: 768px) {
+  .report-charts { grid-template-columns: 1fr; }
+  .chart-box { width: 280px; }
+  .chart-box canvas {
+    width: 220px !important;
+    height: 220px !important;
+  }
+}
+.card + .card {
+  margin-top: 15px;
+}

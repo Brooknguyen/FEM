@@ -80,7 +80,10 @@ export function renderSidebar() {
           <span class="label">Thông tin thiết bị</span>
         </a>
         <a class="side-item side-sublink" href="#/crud/plan">
-          <span class="label">Kế hoạch bảo dưỡng</span>
+          <span class="label">Kế hoạch bảo dưỡng năm</span>
+        </a>
+        <a class="side-item side-sublink" href="#/monthly">
+          <span class="label">Kế hoạch bảo dưỡng tháng</span>
         </a>
       </div>
     </div>

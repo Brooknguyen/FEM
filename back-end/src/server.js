@@ -10,6 +10,7 @@ import authRouter from "./routes/auth.js";
 import deviceRouter from "./routes/device.js"; // <-- sửa tên import ở đây
 import maintanceRouter from "./routes/maintenance.js";
 import { auth } from "./middleware/auth.js";
+import recordsRouter from "./routes/records.js";
 
 const app = express();
 
@@ -53,6 +54,8 @@ app.use("/api/device", deviceRouter);
 
 //route maintenance
 app.use("/api/maintenance", maintanceRouter);
+
+app.use("/api/records", recordsRouter);
 
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI;

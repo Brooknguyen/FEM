@@ -7,6 +7,7 @@ import {
   WaterChillerSheet,
   ExhaustFanSheet,
   ACUSheet,
+  SummarySheet,
 } from "../models/InfoSheet.js";
 
 const router = express.Router();
@@ -88,5 +89,6 @@ router.use(
 );
 router.use("/exhaustfan", createSheetRouter(ExhaustFanSheet, "exhaustfan"));
 router.use("/acu", createSheetRouter(ACUSheet, "acu"));
+router.use("/summary", createSheetRouter(SummarySheet, "summmary"))
 
 export default router;

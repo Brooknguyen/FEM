@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Báo Cáo Bảo Trì Thiết Bị - Tháng 9/2025</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f7f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: auto;
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        h1, h2, h3 {
+            color: #0056b3;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+            margin-top: 30px;
+        }
+        h1 {
+            text-align: center;
+            color: #004a99;
+            margin-top: 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        th {
+            background-color: #0056b3;
+            color: white;
+            font-weight: bold;
+        }
+        tbody tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        tbody tr:hover {
+            background-color: #e9ecef;
+        }
+        .status-ok {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .status-late {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .summary, .equipment-overview ul {
+            background-color: #e7f3ff;
+            border-left: 5px solid #0056b3;
+            padding: 15px;
+            margin-top: 20px;
+            list-style-type: none;
+        }
+        .summary p {
+            margin: 5px 0;
+            font-size: 1.1em;
+        }
+        .chart-container {
+            display: flex;
+            justify-content: space-around;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
+        .chart-box {
+            width: 100%;
+            max-width: 48%;
+            min-width: 300px;
+            padding: 20px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        @media (max-width: 768px) {
+            .chart-box {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>BÁO CÁO TỔNG QUAN HỆ THỐNG & BẢO TRÌ THIẾT BỊ</h1>
+        <h3>Thời gian: Tháng 9 năm 2025</h3>
+
+        <h2>I. TỔNG QUAN THIẾT BỊ</h2>
+        <div class="equipment-overview">
+            <ul>
+                <li><strong>Tổng số thiết bị đang quản lý:</strong> 26</li>
+                <li><strong>Air compressor room #1:</strong> 4 máy (3 Máy nén, 1 Máy sấy)</li>
+                <li><strong>Roof floor:</strong> 3 máy (3 Máy sấy)</li>
+                <li><strong>Khu nhà xe máy:</strong> 2 máy (2 Máy nén khí)</li>
+                <li><strong>Cung cấp cho máy phát Nitro:</strong> 2 máy (2 Máy nén khí)</li>
+                <li><strong>Các khu vực khác:</strong> 15 thiết bị</li>
+            </ul>
+        </div>
+        
+        <h2>II. KẾ HOẠCH & TIẾN ĐỘ BẢO TRÌ THÁNG 9/2025</h2>
+
+        <h3>1. Tỷ lệ hoàn thành kế hoạch</h3>
+        <div class="summary">
+            <p><strong>Tổng số kế hoạch trong tháng:</strong> 15</p>
+            <p><strong>Đã hoàn thành:</strong> 14</p>
+            <p><strong>Chưa hoàn thành:</strong> 1 (Trễ hạn)</p>
+        </div>
+        <div class="chart-container">
+            <div class="chart-box">
+                <h3>Tỷ lệ hoàn thành kế hoạch</h3>
+                <canvas id="completionPieChart"></canvas>
+            </div>
+            <div class="chart-box">
+                <h3>Tỷ lệ thiết bị theo trạng thái</h3>
+                <canvas id="deviceStatusPieChart"></canvas>
+            </div>
+        </div>
+
+        <h3>2. Chi tiết kế hoạch bảo trì tháng 9</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>STT</th>
+                    <th>Hạng mục bảo trì</th>
+                    <th>Thiết bị liên quan</th>
+                    <th>Kế hoạch</th>
+                    <th>Đã thực hiện</th>
+                    <th>Ghi chú</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>1</td>
+                    <td>Bảo dưỡng định kỳ tủ điện</td>
+                    <td>Electric cabinet #1, #2</td>
+                    <td>2025-09-15</td>
+                    <td>2025-09-15</td>
+                    <td class="status-ok">Đúng kế hoạch</td>
+                </tr>
+                <tr>
+                    <td>2</td>
+                    <td>Kiểm tra tiếp địa hệ thống điện</td>
+                    <td>SMT room, Assembly line</td>
+                    <td>2025-09-13</td>
+                    <td>2025-09-13</td>
+                    <td class="status-ok">Hoàn thành</td>
+                </tr>
+                <tr>
+                    <td>3</td>
+                    <td>Check hệ thống UPS</td>
+                    <td>UPS room #1</td>
+                    <td>2025-09-07</td>
+                    <td>2025-09-07</td>
+                    <td>-</td>
+                </tr>
+                <tr>
+                    <td>4</td>
+                    <td>Vệ sinh, kiểm tra Airdryer #15</td>
+                    <td>Airdryer #15</td>
+                    <td>2025-09-15</td>
+                    <td></td>
+                    <td class="status-late">Trễ hạn</td>
+                </tr>
+                 <tr>
+                    <td>5</td>
+                    <td>Kiểm tra cáp busway</td>
+                    <td>Busway Zone A</td>
+                    <td>2025-09-20</td>
+                    <td>2025-09-20</td>
+                    <td class="status-ok">Đo nhiệt độ, siết ốc</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>III. LỊCH SỬ BẢO TRÌ THEO CHU KỲ</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Hạng mục</th>
+                    <th>Chu kỳ</th>
+                    <th>Lần thực hiện gần nhất</th>
+                    <th>Lần kế tiếp</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Kiểm tra tủ điện tải</td>
+                    <td>3 tháng/lần</td>
+                    <td>2025-09-15</td>
+                    <td>2025-12-15</td>
+                </tr>
+                <tr>
+                    <td>Kiểm tra cáp busway</td>
+                    <td>1 tháng/lần</td>
+                    <td>2025-09-20</td>
+                    <td>2025-10-20</td>
+                </tr>
+                <tr>
+                    <td>Kiểm tra nhiệt độ phòng điện</td>
+                    <td>Hàng tuần</td>
+                    <td>2025-09-22</td>
+                    <td>2025-09-29</td>
+                </tr>
+                <tr>
+                    <td>Bảo dưỡng máy nén khí</td>
+                    <td>6 tháng/lần</td>
+                    <td>2025-07-10</td>
+                    <td>2026-01-10</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>IV. CẢNH BÁO THIẾT BỊ / KẾ HOẠCH QUÁ HẠN</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Thiết bị / Hạng mục</th>
+                    <th>Ngày dự kiến</th>
+                    <th>Trạng thái</th>
+                    <th>Ghi chú</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Vệ sinh, kiểm tra Airdryer #15</td>
+                    <td>2025-09-15</td>
+                    <td class="status-late">❌ Trễ hạn</td>
+                    <td>Chưa có báo cáo cập nhật từ bộ phận kỹ thuật.</td>
+                </tr>
+                <tr>
+                    <td>Check tiếp địa SMT room</td>
+                    <td>2025-09-13</td>
+                    <td class="status-ok">✅ Đã hoàn thành</td>
+                    <td>Thông số trong ngưỡng an toàn.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>V. PHÂN TÍCH DỮ LIỆU</h2>
+        <div class="chart-container">
+            <div class="chart-box">
+                <h3>Số lượng kế hoạch bảo trì theo tháng (6 tháng gần nhất)</h3>
+                <canvas id="monthlyTasksBarChart"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Data
+        const completionData = {
+            labels: ['Đã hoàn thành', 'Chưa hoàn thành'],
+            datasets: [{
+                label: 'Tỷ lệ',
+                data: [14, 1],
+                backgroundColor: ['#28a745', '#dc3545'],
+                hoverOffset: 4
+            }]
+        };
+
+        const deviceStatusData = {
+            labels: ['Hoạt động', 'Đang bảo trì', 'Bị hỏng'],
+            datasets: [{
+                label: 'Trạng thái thiết bị',
+                data: [22, 3, 1],
+                backgroundColor: ['#007bff', '#ffc107', '#6c757d'],
+                hoverOffset: 4
+            }]
+        };
+
+        const monthlyTasksData = {
+            labels: ['Tháng 4', 'Tháng 5', 'Tháng 6', 'Tháng 7', 'Tháng 8', 'Tháng 9'],
+            datasets: [{
+                label: 'Số kế hoạch bảo trì',
+                data: [12, 18, 15, 20, 17, 15],
+                backgroundColor: '#0056b3',
+                borderColor: '#004a99',
+                borderWidth: 1
+            }]
+        };
+
+        // Render Charts
+        const ctx1 = document.getElementById('completionPieChart').getContext('2d');
+        new Chart(ctx1, {
+            type: 'pie',
+            data: completionData,
+            options: { responsive: true, maintainAspectRatio: true }
+        });
+
+        const ctx2 = document.getElementById('deviceStatusPieChart').getContext('2d');
+        new Chart(ctx2, {
+            type: 'doughnut',
+            data: deviceStatusData,
+            options: { responsive: true, maintainAspectRatio: true }
+        });
+
+        const ctx3 = document.getElementById('monthlyTasksBarChart').getContext('2d');
+        new Chart(ctx3, {
+            type: 'bar',
+            data: monthlyTasksData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    </script>
+
+</body>
+</html>

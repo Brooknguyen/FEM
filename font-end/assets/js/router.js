@@ -1,7 +1,11 @@
 // router.js
-import { renderInfoRoute } from "./pages/info/index.js"; // bộ điều phối /info/:tab
-import { renderPlanRoute } from "./pages/plan/index_plan.js"; // bộ điều phối /plan/:tab
-import { renderReport } from "./pages/report.js";
+import { renderInfoRoute } from "./pages/info/index.js";
+import { renderPlanRoute } from "./pages/plan/index_plan.js";
+import {
+  renderReport,
+  initReportPage,
+  renderReportPage,
+} from "./pages/report/report.js";
 import { renderCrudInfoRoute } from "./pages/crud_info/crud.index.js";
 import { renderCrudPlanRoute } from "./pages/crud_plan/crud.index.plan.js";
 import {
@@ -10,6 +14,10 @@ import {
   bindLoginEvents,
   bindRegisterEvents,
 } from "./login/login.js";
+import {
+  renderMaintenance,
+  initMaintenance,
+} from "./pages/crud_plan/monthly.js";
 
 const isAuthed = () =>
   !!sessionStorage.getItem("auth_token") ||
@@ -34,7 +42,13 @@ function getUserRole() {
   }
 }
 
-export function renderRoute() {
+// helper: nhận string hoặc Promise<string>
+async function setHTML(el, maybeHTML) {
+  el.innerHTML = await Promise.resolve(maybeHTML);
+}
+
+export async function renderRoute() {
+  // <--- async
   const path = currentPath();
   const main = document.getElementById("main");
   if (!main) return;
@@ -46,12 +60,10 @@ export function renderRoute() {
   const isForgot = path === "/forgot";
   const authed = isAuthed();
 
-  // Cho phép vào /login & /register khi chưa đăng nhập
   if (!isLogin && !isRegister && !isForgot && !authed) {
     navigate("/login");
     return;
   }
-  // Nếu đã đăng nhập thì không cho vào /login & /register
   if ((isLogin || isRegister || isForgot) && authed) {
     navigate("/info/air");
     return;
@@ -62,7 +74,6 @@ export function renderRoute() {
     isLogin || isRegister || isForgot
   );
 
-  // Bỏ highlight menu ở login & register
   if (!isLogin && !isRegister && !isForgot) {
     document.querySelectorAll(".side-link, .side-sublink").forEach((a) => {
       a.classList.toggle("active", a.getAttribute("href") === `#${path}`);
@@ -70,25 +81,25 @@ export function renderRoute() {
   }
 
   if (isLogin) {
-    main.innerHTML = renderLogin();
-    bindLoginEvents(); // <-- cần gọi
+    await setHTML(main, renderLogin());
+    bindLoginEvents();
     return;
   }
 
   if (isRegister) {
-    main.innerHTML = renderRegister();
-    bindRegisterEvents(); // <-- đã gọi OK
+    await setHTML(main, renderRegister());
+    bindRegisterEvents();
     return;
   }
 
   if (isForgot) {
-    main.innerHTML = renderLogin();
+    await setHTML(main, renderLogin());
     bindLoginEvents();
     return;
   }
 
   if (path.startsWith("/info/")) {
-    main.innerHTML = renderInfoRoute(path);
+    await setHTML(main, renderInfoRoute(path)); // future-proof nếu route async
     return;
   }
 
@@ -97,19 +108,18 @@ export function renderRoute() {
     return;
   }
 
-  // 2) Bắt tất cả /crud_info/:tab
   if (path.startsWith("/crud_info/")) {
     if (role !== "admin") {
       alert("Access denied. Admins only.");
       navigate("/info/air");
       return;
     }
-    main.innerHTML = renderCrudInfoRoute(path);
+    await setHTML(main, renderCrudInfoRoute(path));
     return;
   }
 
   if (path.startsWith("/plan/")) {
-    main.innerHTML = renderPlanRoute(path);
+    await setHTML(main, renderPlanRoute(path));
     return;
   }
 
@@ -124,17 +134,29 @@ export function renderRoute() {
       navigate("/plan/electric");
       return;
     }
-    main.innerHTML = renderCrudPlanRoute(path);
+    await setHTML(main, renderCrudPlanRoute(path));
     return;
   }
 
   if (path === "/report") {
-    main.innerHTML = renderReport();
+    main.innerHTML = await renderReportPage(); // render chart+ maintenance
+    await initReportPage(); // init chart maintenance
     return;
   }
 
-  // fallback
+  if (path == "/monthly") {
+    await setHTML(main, renderMaintenance());
+    await initMaintenance();
+    return;
+  }
+
   navigate("/info/air");
 }
-window.addEventListener("hashchange", renderRoute);
-window.addEventListener("load", renderRoute);
+
+// event handler có thể là async; Promise return sẽ bị bỏ qua, không sao
+window.addEventListener("hashchange", () => {
+  renderRoute();
+});
+window.addEventListener("load", () => {
+  renderRoute();
+});

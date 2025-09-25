@@ -72,6 +72,15 @@ export const CRUD_INFO_RESOURCES = {
     latestAny: () => `${API_BASE}/tank/latest`,
     postPath: () => `${API_BASE}/tank`,
   },
+  summary: {
+    key: "summary",
+    title: "Tổng số thiết bị đang có hiện tại",
+    defaultSheet: "Summary",
+    latestByName: (sheet) =>
+      `${API_BASE}/summary/${encodeURIComponent(sheet)}/latest`,
+    latestAny: () => `${API_BASE}/summary/latest`,
+    postPath: () => `${API_BASE}/summary`,
+  },
 };
 
 // Dùng để dựng thanh tabs (key + label giống file tabs cũ)
@@ -83,6 +92,7 @@ export const CRUD_INFO_TABS = [
   { key: "tank", label: "Pressure Tank" },
   { key: "exhaust", label: "Exhaust Fan" },
   { key: "ac", label: "ACU + Aircon" },
+  { key: "summary", label: "Summary" },
 ];
 
 export const CRUD_INFO_KEYS = new Set(CRUD_INFO_TABS.map((t) => t.key));
