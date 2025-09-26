@@ -69,7 +69,7 @@ router.get("/months/list", async (_req, res, next) => {
 /* ------------------- POST /api/records ------------------- */
 router.post("/", async (req, res, next) => {
   try {
-    const { task, equipment, plannedDate, actualDate, note } = req.body || {};
+    const { task, equipment, plannedDate, actualDate,status, note } = req.body || {};
     if (!task || !equipment || !plannedDate) {
       return res.status(400).send("task, equipment, plannedDate là bắt buộc");
     }
@@ -78,7 +78,8 @@ router.post("/", async (req, res, next) => {
       equipment,
       plannedDate: new Date(plannedDate),
       actualDate: actualDate ? new Date(actualDate) : null,
-      note: note || ""
+      status: status || "",
+      note: note || "",
     });
     res.status(201).json(doc);
   } catch (e) {

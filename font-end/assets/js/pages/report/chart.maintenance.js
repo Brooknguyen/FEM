@@ -1,10 +1,9 @@
-//chart.maintenance.js
 import { fmt } from "./chart.js";
 
 const today = new Date();
 const year = today.getFullYear();
 
-// Render khung HTML cho biểu đồ 12 tháng
+// Render HTML khung chứa biểu đồ
 export function renderBarMaintenance() {
   return `
     <div class="chart-box" style="width: 100%; min-width:800px; text-align:center;">
@@ -16,12 +15,11 @@ export function renderBarMaintenance() {
   `;
 }
 
-// Khởi tạo biểu đồ cột 12 tháng
+// Khởi tạo biểu đồ cột dữ liệu kế hoạch bảo trì
 export async function initBarMaintenance() {
   const ctx = document.getElementById("mtBarChart")?.getContext("2d");
   if (!ctx) return;
 
-  // Dữ liệu mẫu: số lượng kế hoạch bảo trì mỗi tháng
   const labels = [
     "T1",
     "T2",
@@ -36,7 +34,24 @@ export async function initBarMaintenance() {
     "T11",
     "T12",
   ];
-  const values = [5, 8, 7, 10, 6, 4, 9, 12, 7, 11, 5, 8];
+  const values = new Array(12).fill(0); // Mỗi tháng khởi tạo 0 kế hoạch
+  const currentYear = new Date().getFullYear();
+
+  try {
+    const res = await fetch("http://10.100.201.25:4000/api/records");
+    const data = await res.json();
+
+    data.forEach((item) => {
+      if (item.year === currentYear && typeof item.month === "number") {
+        const monthIndex = item.month - 1; // Chuyển tháng từ 1-12 thành 0-11
+        if (monthIndex >= 0 && monthIndex < 12) {
+          values[monthIndex]++;
+        }
+      }
+    });
+  } catch (err) {
+    console.error("Lỗi khi tải dữ liệu kế hoạch:", err);
+  }
 
   new window.Chart(ctx, {
     type: "bar",
@@ -55,31 +70,21 @@ export async function initBarMaintenance() {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      layout: {
-        padding: 10,
-      },
+      layout: { padding: 10 },
       scales: {
         y: {
-          grid: {
-            display: false,
-          },
+          grid: { display: false },
           ticks: {
             callback: (v) => fmt(v),
-            font: {
-              size: 12,
-            },
+            font: { size: 12 },
             color: "#FF6600",
           },
           beginAtZero: true,
         },
         x: {
-          grid: {
-            display: false,
-          },
+          grid: { display: false },
           ticks: {
-            font: {
-              size: 12,
-            },
+            font: { size: 12 },
             color: "#FF6600",
           },
         },
@@ -93,12 +98,20 @@ export async function initBarMaintenance() {
         },
         datalabels: {
           anchor: "end",
-          align: "start",
+          align: (ctx) => {
+            return ctx.dataset.data[ctx.dataIndex] === 0 ? "end" : "start";
+          },
           color: "#FF6600",
           font: {
             weight: "bold",
             size: 12,
           },
+          formatter: (value) => {
+            return value === 0 ? "" : value;
+          },
+          formatter: (value) => value,
+          clamp: true,
+          clip: false,
         },
       },
     },

@@ -9,8 +9,13 @@ export const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 // Bảng màu mặc định
 export const PALETTE = [
-  "#4F81BD", "#C0504D", "#9BBB59", "#8064A2",
-  "#4BACC6", "#F79646", "#92A9CF"
+  "#4F81BD",
+  "#C0504D",
+  "#9BBB59",
+  "#8064A2",
+  "#4BACC6",
+  "#F79646",
+  "#92A9CF",
 ];
 
 // Nạp Chart.js + Datalabels + plugin “centerText” (chỉ 1 lần)
@@ -21,16 +26,22 @@ export async function loadChartLibs() {
   const load = (src) =>
     new Promise((res, rej) => {
       const s = document.createElement("script");
-      s.src = src; s.async = true; s.onload = res;
+      s.src = src;
+      s.async = true;
+      s.onload = res;
       s.onerror = () => rej(new Error(`Fail ${src}`));
       document.head.appendChild(s);
     });
 
   if (!window.Chart) {
-    await load("https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js");
+    await load(
+      "https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"
+    );
   }
   if (!window.ChartDataLabels) {
-    await load("https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js");
+    await load(
+      "https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"
+    );
   }
 
   // Plugin vẽ chữ giữa donut
@@ -87,13 +98,15 @@ export function drawDonut({
     type: "doughnut",
     data: {
       labels,
-      datasets: [{
-        label: datasetLabel,
-        data: values,
-        backgroundColor: palette.slice(0, labels.length),
-        borderColor: "transparent",
-        borderWidth: 2,
-      }],
+      datasets: [
+        {
+          label: datasetLabel,
+          data: values,
+          backgroundColor: palette.slice(0, labels.length),
+          borderColor: "transparent",
+          borderWidth: 2,
+        },
+      ],
     },
     options: {
       cutout: "70%",
@@ -102,9 +115,16 @@ export function drawDonut({
       plugins: {
         legend: {
           position: "bottom",
-          labels: { usePointStyle: true, boxWidth: 4, boxHeight: 4, font: { size: 11 } },
+          labels: {
+            usePointStyle: true,
+            boxWidth: 4,
+            boxHeight: 4,
+            font: { size: 11 },
+          },
         },
-        tooltip: { callbacks: { label: (ctx) => `${ctx.label}: ${fmt(ctx.raw)}` } },
+        tooltip: {
+          callbacks: { label: (ctx) => `${ctx.label}: ${fmt(ctx.raw)}` },
+        },
         datalabels: datalabelsAsValue,
         centerText: { lines: centerLines },
       },
@@ -117,8 +137,11 @@ export function drawDonut({
 // ===== Nội bộ xử lý bảng dữ liệu (preload / getValue) =====
 const norm = (s) =>
   String(s ?? "")
-    .normalize("NFKC").toLowerCase().trim()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/\s+/g, " ");
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -130,7 +153,9 @@ async function fetchJSONWithRetry(url, tries = 3) {
     if (res.status === 429 && t < tries) {
       const ra = res.headers.get("retry-after");
       const wait = ra ? Number(ra) * 1000 : 1200 * Math.pow(2, t);
-      await sleep(wait); t++; continue;
+      await sleep(wait);
+      t++;
+      continue;
     }
     if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
     return res.json();
@@ -170,6 +195,35 @@ function extractNumeric(s) {
   return Number.isFinite(n) ? n : null;
 }
 
+// function extractNumeric(s) {
+//   if (!s) return null;
+//   const str = String(s).trim();
+
+//   // Trường hợp có cả dấu chấm và phẩy
+//   if (str.includes(".") && str.includes(",")) {
+//     const normalized = str.replace(/\./g, "").replace(",",".");
+//     const n = Number(normalized);
+//     return Number.isFinite(n) ? n : null;
+//   }
+
+//   // Trường hợp chỉ có dấu phẩy (VN style): "1,234" => 1234
+//   if (str.includes(",") && !str.includes(".")){
+//     const normalized = str.replace(/,/g, "");
+//     const n = Number(normalized);
+//     return Number.isFinite(n) ? n : null;
+//   }
+
+//   // Trường hợp chỉ có dấu chấm (US/UK style): "1.234" => 1.234
+//   if (str.includes(".") && !str.includes(",")){
+//     const n = Number(str);
+//     return Number.isFinite(n) ? n : null;
+//   }
+
+//   // Trường hợp chỉ là số nguyên: "1234"
+//   const n = Number(str);
+//   return Number.isFinite(n) ? n : null;
+// }
+
 // ---------- state ----------
 let _loaded = false;
 let _out = [];
@@ -182,22 +236,25 @@ export async function preload() {
   const rows = Array.isArray(payload.rows) ? payload.rows : [];
   if (!rows.length) throw new Error("Không có dữ liệu rows.");
 
-  _nameColInfo =
-    findColIdx(rows, /(ut\s*machine\s*system)/) ||
-    findColIdx(rows, /(system|ten|name)/) ||
-    { col: 0, headerRow: 0 };
+  _nameColInfo = findColIdx(rows, /(ut\s*machine\s*system)/) ||
+    findColIdx(rows, /(system|ten|name)/) || { col: 0, headerRow: 0 };
 
   _metricCols = { qty: null, kw: null, capa: null };
   for (const [key, regexList] of Object.entries(METRIC_HEADER_REGEXES)) {
     for (const re of regexList) {
       const found = findColIdx(rows, re);
-      if (found) { _metricCols[key] = found; break; }
+      if (found) {
+        _metricCols[key] = found;
+        break;
+      }
     }
   }
 
   const headerMaxRow = Math.max(
     _nameColInfo.headerRow,
-    ...Object.values(_metricCols).filter(Boolean).map((x) => x.headerRow)
+    ...Object.values(_metricCols)
+      .filter(Boolean)
+      .map((x) => x.headerRow)
   );
   const startRow = headerMaxRow + 1;
 

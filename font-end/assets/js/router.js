@@ -145,6 +145,11 @@ export async function renderRoute() {
   }
 
   if (path == "/monthly") {
+    if (role !== "admin") {
+      alert("Access denied. Admins only.");
+      navigate("/plan/electric");
+      return;
+    }
     await setHTML(main, renderMaintenance());
     await initMaintenance();
     return;

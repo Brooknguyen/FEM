@@ -1,4 +1,3 @@
-// report/maintenance.js
 const API_BASE = "http://10.100.201.25:4000/api/records";
 
 // Helpers thời gian
@@ -11,19 +10,12 @@ const ym = (v) => {
   )}`;
 };
 
-// Ghi chú cố định
-const NOTE = {
+// Trạng thái cố định
+const STATUS = {
   DONE: "Hoàn thành",
-  LATE: "Trễ hẹn",
+  LATE: "Trễ hạn",
   TODO: "Chưa thực hiện",
 };
-function normalizeNote(n) {
-  const s = String(n || "").toLowerCase();
-  if (s.includes("hoàn") || s.includes("đúng")) return NOTE.DONE;
-  if (s.includes("trễ")) return NOTE.LATE;
-  if (s.includes("chưa")) return NOTE.TODO;
-  return NOTE.TODO;
-}
 
 // Fetch helpers an toàn (trả về JSON hoặc throw lỗi rõ ràng)
 async function jget(u) {
@@ -41,7 +33,7 @@ export async function renderMaintenance() {
   return `
   <section class="card p-4" id="maintenance-section">
     <h2 class="text-xl font-bold mb-4" style="text-align:center; font-weight: bold; font-size: 16px">Kế hoạch bảo trì tháng</h2>
- 
+
     <div class="toolbar" style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
       <label style="font-weight:600">Tháng:
         <select id="mt-month" style="padding:8px 10px;border:1px solid #ddd;border-radius:8px">
@@ -65,6 +57,7 @@ export async function renderMaintenance() {
             <th style="text-align:left;padding:10px;border-bottom:1px solid #eee">Bộ phận liên quan</th>
             <th style="text-align:left;padding:10px;border-bottom:1px solid #eee">Kế hoạch</th>
             <th style="text-align:left;padding:10px;border-bottom:1px solid #eee">Đã thực hiện</th>
+            <th style="text-align:left;padding:10px;border-bottom:1px solid #eee">Trạng thái</th>
             <th style="text-align:left;padding:10px;border-bottom:1px solid #eee">Ghi chú</th>
           </tr>
         </thead>
@@ -80,15 +73,14 @@ export async function initMaintenance() {
     yearSelect = $("#mt-year"),
     tbody = $("#mt-tbody");
 
-  function renderNote(n) {
-    const note = normalizeNote(n);
+  function renderStatus(status) {
     const base =
       "display:inline-block;padding:2px 8px;border-radius:999px;font-weight:600;";
-    if (note === NOTE.DONE)
-      return `<span style="${base}background:#e7f8ee;color:#058f3e">${NOTE.DONE}</span>`;
-    if (note === NOTE.LATE)
-      return `<span style="${base}background:#ffe6e3;color:#c92408">${NOTE.LATE}</span>`;
-    return `<span style="${base}background:#e5e7eb;color:#111827">${NOTE.TODO}</span>`;
+    if (status === STATUS.DONE)
+      return `<span style="${base}background:#e7f8ee;color:#058f3e">${STATUS.DONE}</span>`;
+    if (status === STATUS.LATE)
+      return `<span style="${base}background:#ffe6e3;color:#c92408">${STATUS.LATE}</span>`;
+    return `<span style="${base}background:#e5e7eb;color:#111827">${STATUS.TODO}</span>`;
   }
 
   function ymStr() {
@@ -101,8 +93,6 @@ export async function initMaintenance() {
     const current = new Date();
     const currentYear = current.getFullYear();
     const currentMonth = current.getMonth() + 1;
-
-    // Tạo danh sách năm từ (currentYear - 5) đến (currentYear + 1)
     const years = Array.from({ length: 7 }, (_, i) => currentYear - 5 + i);
     yearSelect.innerHTML = years
       .map((y) => `<option value="${y}">${y}</option>`)
@@ -120,17 +110,8 @@ export async function initMaintenance() {
 
       if (!Array.isArray(rows)) throw new Error("Payload không phải mảng.");
 
-      // ⬇️ Auto tính "Ghi chú" nếu chưa có actualDate
-      const today = new Date();
-      for (const r of rows) {
-        if (!r.actualDate) {
-          const planned = new Date(r.plannedDate);
-          r.note = planned < today ? NOTE.LATE : NOTE.TODO;
-        }
-      }
-
       if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="padding:10px;text-align:center;color:#6b7280">Không có dữ liệu</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:10px;text-align:center;color:#6b7280">Không có dữ liệu</td></tr>`;
         return;
       }
 
@@ -139,11 +120,24 @@ export async function initMaintenance() {
           (r, i) => `
       <tr>
         <td style="padding:10px;border-bottom:1px solid #eee">${i + 1}</td>
-        <td style="padding:10px;border-bottom:1px solid #eee">${r.task ?? ""}</td>
-        <td style="padding:10px;border-bottom:1px solid #eee">${r.equipment ?? ""}</td>
-        <td style="padding:10px;border-bottom:1px solid #eee">${d(r.plannedDate)}</td>
-        <td style="padding:10px;border-bottom:1px solid #eee">${d(r.actualDate)}</td>
-        <td style="padding:10px;border-bottom:1px solid #eee">${renderNote(r.note)}</td>
+        <td style="padding:10px;border-bottom:1px solid #eee">${
+          r.task ?? ""
+        }</td>
+        <td style="padding:10px;border-bottom:1px solid #eee">${
+          r.equipment ?? ""
+        }</td>
+        <td style="padding:10px;border-bottom:1px solid #eee">${d(
+          r.plannedDate
+        )}</td>
+        <td style="padding:10px;border-bottom:1px solid #eee">${d(
+          r.actualDate
+        )}</td>
+        <td style="padding:10px;border-bottom:1px solid #eee">${renderStatus(
+          r.status
+        )}</td>
+        <td style="padding:10px;border-bottom:1px solid #eee">${
+          r.note || ""
+        }</td>
       </tr>
     `
         )
@@ -151,13 +145,13 @@ export async function initMaintenance() {
     } catch (e) {
       console.error(e);
       alert("Không tải được dữ liệu bảo trì.\n" + e.message);
-      tbody.innerHTML = `<tr><td colspan="6" style="padding:10px;text-align:center;color:#ef4444">Lỗi tải dữ liệu</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="padding:10px;text-align:center;color:#ef4444">Lỗi tải dữ liệu</td></tr>`;
     }
   }
 
   monthSelect?.addEventListener("change", loadTable);
   yearSelect?.addEventListener("change", loadTable);
 
-  await initMonthYearSelectors();
+  initMonthYearSelectors();
   await loadTable();
 }

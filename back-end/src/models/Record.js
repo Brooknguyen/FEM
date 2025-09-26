@@ -8,6 +8,11 @@ const RecordSchema = new mongoose.Schema(
     plannedDate: { type: Date, required: true },
     actualDate: { type: Date, default: null },
     note: { type: String, default: "" },
+    status: {
+      type: String,
+      enum: ["Hoàn thành", "Trễ hạn", "Chưa thực hiện"],
+      default: "Chưa thực hiện",
+    },
 
     // các trường phục vụ lọc nhanh
     monthKey: { type: String, index: true }, // "YYYY-MM" theo plannedDate (UTC)
