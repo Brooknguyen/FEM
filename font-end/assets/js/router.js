@@ -2,9 +2,8 @@
 import { renderInfoRoute } from "./pages/info/index.js";
 import { renderPlanRoute } from "./pages/plan/index_plan.js";
 import {
-  renderReport,
-  initReportPage,
-  renderReportPage,
+  renderMaintenance,
+  setupReportEvents
 } from "./pages/report/report.js";
 import { renderCrudInfoRoute } from "./pages/crud_info/crud.index.js";
 import { renderCrudPlanRoute } from "./pages/crud_plan/crud.index.plan.js";
@@ -14,10 +13,7 @@ import {
   bindLoginEvents,
   bindRegisterEvents,
 } from "./login/login.js";
-import {
-  renderMaintenance,
-  initMaintenance,
-} from "./pages/crud_plan/monthly.js";
+
 
 const isAuthed = () =>
   !!sessionStorage.getItem("auth_token") ||
@@ -139,21 +135,11 @@ export async function renderRoute() {
   }
 
   if (path === "/report") {
-    main.innerHTML = await renderReportPage(); // render chart+ maintenance
-    await initReportPage(); // init chart maintenance
+    await setHTML(main, renderMaintenance());
+    setupReportEvents();;
     return;
   }
 
-  if (path == "/monthly") {
-    if (role !== "admin") {
-      alert("Access denied. Admins only.");
-      navigate("/plan/electric");
-      return;
-    }
-    await setHTML(main, renderMaintenance());
-    await initMaintenance();
-    return;
-  }
 
   navigate("/info/air");
 }

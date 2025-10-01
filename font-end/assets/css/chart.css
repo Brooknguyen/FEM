@@ -85,4 +85,17 @@
 .card + .card {
   margin-top: 15px;
 }
+.table-report {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+}
+
+.table-report th,
+.table-report td {
+  padding: 8px;
+  border: 1px solid #ccc;
+  text-align: left;
+}
+
 

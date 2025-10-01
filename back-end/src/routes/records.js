@@ -1,120 +1,208 @@
-// routes/records.js
 import express from "express";
-import Record from "../models/Record.js";
+import multer from "multer";
+import sharp from "sharp";
+import path from "path";
+import fs from "fs";
+import ReportFilter from "../models/filterReport.js";
 
 const router = express.Router();
 
-/* -------- helpers -------- */
-function parseMonthQuery(q) {
-  // Hỗ trợ ?month=YYYY-MM hoặc ?year=YYYY&month=MM
-  if (q.month && /^\d{4}-\d{2}$/.test(q.month)) {
-    const [y, m] = q.month.split("-").map(Number);
-    return { year: y, month: m };
+const UPLOAD_DIR =
+  process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads");
+fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+function urlToFilePath(url) {
+  try {
+    let pathname = url || "";
+    if (/^https?:\/\//i.test(pathname)) pathname = new URL(pathname).pathname;
+    // pathname: /uploads/TYPE/DATE/FILE
+    const rel = pathname.replace(/^\/?uploads[\/\\]?/, "");
+    return path.join(UPLOAD_DIR, rel);
+  } catch {
+    return "";
   }
-  if (q.year && q.month) {
-    const y = Number(q.year);
-    const m = Number(q.month);
-    if (Number.isInteger(y) && Number.isInteger(m) && m >= 1 && m <= 12) {
-      return { year: y, month: m };
-    }
+}
+async function deleteFileByUrl(url) {
+  const full = urlToFilePath(url);
+  if (!full) return;
+  try {
+    await fs.promises.unlink(full);
+  } catch (_) {
+    /* ignore */
   }
-  return null;
 }
 
-function monthRangeUtc(year, month) {
-  // start: YYYY-MM-01T00:00:00Z ; end: first day of next month
-  const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
-  const end = new Date(Date.UTC(year, month, 1, 0, 0, 0, 0));
-  return { start, end };
+async function saveCompressedImage(
+  buffer,
+  { type, date, field, no, originalName }
+) {
+  const safeDate = String(date || "").replace(/\//g, "-");
+  const folder = path.join(UPLOAD_DIR, type, safeDate);
+  fs.mkdirSync(folder, { recursive: true });
+
+  const filename = `${Date.now()}-${field}-${no}.webp`;
+  const fullPath = path.join(folder, filename);
+
+  try {
+    await sharp(buffer)
+      .rotate()
+      .resize({
+        width: 1600,
+        height: 1600,
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .webp({ quality: 70 })
+      .toFile(fullPath);
+    const baseUrl = process.env.BASE_URL || "";
+    const urlPath = `/uploads/${type}/${safeDate}/${filename}`;
+    return baseUrl ? `${baseUrl}${urlPath}` : urlPath;
+  } catch (err) {
+    // fallback raw
+    const ext = (originalName && path.extname(originalName)) || ".bin";
+    const rawName = `${Date.now()}-${field}-${no}${ext}`;
+    await fs.promises.writeFile(path.join(folder, rawName), buffer);
+    const baseUrl = process.env.BASE_URL || "";
+    const urlPath = `/uploads/${type}/${safeDate}/${rawName}`;
+    return baseUrl ? `${baseUrl}${urlPath}` : urlPath;
+  }
 }
 
-/* --------- GET /api/records?month=YYYY-MM --------- */
-router.get("/", async (req, res, next) => {
+// GET /api/records/:type?date=YYYY-MM-DD
+router.get("/:type", async (req, res) => {
   try {
-    const parsed = parseMonthQuery(req.query);
-    let filter = {};
-    if (parsed) {
-      const { start, end } = monthRangeUtc(parsed.year, parsed.month);
-      filter.plannedDate = { $gte: start, $lt: end };
+    const { type } = req.params;
+    let { date } = req.query;
+    if (!date) return res.status(400).json({ error: "Missing date" });
+    date = String(date).replace(/\//g, "-");
+
+    const items = await ReportFilter.find({ type, date })
+      .sort({ no: 1 })
+      .lean();
+    return res.json({ type, date, items });
+  } catch (e) {
+    console.error("[GET /api/records/:type]", e);
+    return res.status(500).json({ error: e?.message || "Server error" });
+  }
+});
+
+// POST /api/records/:type?date=YYYY-MM-DD
+router.post("/:type", upload.any(), async (req, res) => {
+  try {
+    const { type } = req.params;
+    let { date } = req.query;
+    if (!date) return res.status(400).json({ error: "Missing date" });
+    date = String(date).replace(/\//g, "-");
+
+    // Parse items
+    let parsed = [];
+    try {
+      parsed = JSON.parse(req.body.items || "[]");
+      if (!Array.isArray(parsed)) throw new Error("items must be array");
+    } catch {
+      return res.status(400).json({ error: "Invalid items JSON" });
     }
-    const rows = await Record.find(filter).sort({ plannedDate: 1, createdAt: 1 }).lean();
-    res.json(rows);
-  } catch (e) {
-    next(e);
-  }
-});
 
-/* --------- GET /api/records/months/list --------- */
-router.get("/months/list", async (_req, res, next) => {
-  try {
-    const months = await Record.aggregate([
-      { $match: { plannedDate: { $type: "date" } } },
-      {
-        $project: {
-          ym: {
-            $dateToString: { format: "%Y-%m", date: "$plannedDate", timezone: "UTC" }
-          }
-        }
-      },
-      { $group: { _id: "$ym" } },
-      { $sort: { _id: -1 } },
-      { $limit: 60 } // tối đa 5 năm gần nhất
-    ]);
-    res.json(months.map((m) => m._id));
-  } catch (e) {
-    next(e);
-  }
-});
+    // Map files
+    const fileMap = new Map();
+    for (const f of req.files || []) fileMap.set(f.fieldname, f);
 
-/* ------------------- POST /api/records ------------------- */
-router.post("/", async (req, res, next) => {
-  try {
-    const { task, equipment, plannedDate, actualDate,status, note } = req.body || {};
-    if (!task || !equipment || !plannedDate) {
-      return res.status(400).send("task, equipment, plannedDate là bắt buộc");
+    // Load existing docs once
+    const nos = parsed
+      .map((it) => Number(it.no))
+      .filter((n) => Number.isFinite(n));
+    const existingDocs = await ReportFilter.find({
+      type,
+      date,
+      no: { $in: nos },
+    }).lean();
+    const existByNo = new Map(existingDocs.map((d) => [d.no, d]));
+
+    // Build bulk ops
+    const ops = [];
+
+    for (const it of parsed) {
+      const no = Number(it.no);
+      if (!Number.isFinite(no)) continue;
+
+      const exists = existByNo.get(no);
+      const beforeFile =
+        fileMap.get(`before-${no}`) ||
+        fileMap.get(`file-${no}-pictureBefore`) ||
+        fileMap.get(`file-${no - 1}-pictureBefore`);
+
+      const afterFile =
+        fileMap.get(`after-${no}`) ||
+        fileMap.get(`file-${no}-pictureAfter`) ||
+        fileMap.get(`file-${no - 1}-pictureAfter`);
+
+      let pictureBeforeUrl, pictureAfterUrl;
+
+      // Nếu upload file mới -> lưu & xoá file cũ (nếu có)
+      if (beforeFile?.buffer) {
+        pictureBeforeUrl = await saveCompressedImage(beforeFile.buffer, {
+          type,
+          date,
+          field: "before",
+          no,
+          originalName: beforeFile.originalname,
+        });
+        if (exists?.pictureBeforeUrl)
+          await deleteFileByUrl(exists.pictureBeforeUrl);
+      }
+      if (afterFile?.buffer) {
+        pictureAfterUrl = await saveCompressedImage(afterFile.buffer, {
+          type,
+          date,
+          field: "after",
+          no,
+          originalName: afterFile.originalname,
+        });
+        if (exists?.pictureAfterUrl)
+          await deleteFileByUrl(exists.pictureAfterUrl);
+      }
+
+      // Nếu người dùng bấm xoá ảnh (removeBefore/removeAfter)
+      if (!beforeFile && it.removeBefore && exists?.pictureBeforeUrl) {
+        await deleteFileByUrl(exists.pictureBeforeUrl);
+        pictureBeforeUrl = ""; // ghi rỗng DB
+      }
+      if (!afterFile && it.removeAfter && exists?.pictureAfterUrl) {
+        await deleteFileByUrl(exists.pictureAfterUrl);
+        pictureAfterUrl = ""; // ghi rỗng DB
+      }
+
+      const $set = {
+        machineName: it.machineName ?? "",
+        room: it.room ?? "",
+        content: it.content ?? "",
+        result: it.result ?? "OK",
+        personInCharge: it.personInCharge ?? "",
+      };
+      if (pictureBeforeUrl !== undefined)
+        $set.pictureBeforeUrl = pictureBeforeUrl;
+      if (pictureAfterUrl !== undefined) $set.pictureAfterUrl = pictureAfterUrl;
+
+      ops.push({
+        updateOne: {
+          filter: { type, date, no },
+          update: { $setOnInsert: { type, date, no }, $set },
+          upsert: true,
+        },
+      });
     }
-    const doc = await Record.create({
-      task,
-      equipment,
-      plannedDate: new Date(plannedDate),
-      actualDate: actualDate ? new Date(actualDate) : null,
-      status: status || "",
-      note: note || "",
-    });
-    res.status(201).json(doc);
-  } catch (e) {
-    next(e);
-  }
-});
 
-/* ------------------- PUT /api/records/:id ------------------- */
-router.put("/:id", async (req, res, next) => {
-  try {
-    const id = req.params.id;
-    const update = { ...req.body };
-    if (update.plannedDate) update.plannedDate = new Date(update.plannedDate);
-    if (update.actualDate) update.actualDate = new Date(update.actualDate);
-
-    const doc = await Record.findOneAndUpdate({ _id: id }, update, {
-      new: true,
-      runValidators: true
-    });
-    if (!doc) return res.status(404).send("Not found");
-    res.json(doc);
+    if (ops.length) await ReportFilter.bulkWrite(ops, { ordered: false });
+    return res.json({ ok: true });
   } catch (e) {
-    next(e);
-  }
-});
-
-/* ----------------- DELETE /api/records/:id ----------------- */
-router.delete("/:id", async (req, res, next) => {
-  try {
-    const id = req.params.id;
-    const r = await Record.deleteOne({ _id: id });
-    if (r.deletedCount === 0) return res.status(404).send("Not found");
-    res.json({ ok: true });
-  } catch (e) {
-    next(e);
+    console.error("[POST /api/records/:type]", e);
+    const msg =
+      (e?.code === 11000 && "Duplicate key (type,date,no).") ||
+      e?.message ||
+      "Server error";
+    return res.status(500).json({ error: msg });
   }
 });
 

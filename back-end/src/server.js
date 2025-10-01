@@ -1,24 +1,32 @@
+// server.js
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 dotenv.config();
+import path from "path";
 
 import { connectDB } from "./db.js";
 import authRouter from "./routes/auth.js";
-import deviceRouter from "./routes/device.js"; // <-- sửa tên import ở đây
+import deviceRouter from "./routes/device.js";
 import maintanceRouter from "./routes/maintenance.js";
 import { auth } from "./middleware/auth.js";
 import recordsRouter from "./routes/records.js";
 
 const app = express();
 
-// --- security & parsers ---
-app.use(helmet());
+// ✅ Helmet: cho phép cross-origin resource cho ảnh, tắt COEP
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginEmbedderPolicy: false,
+  })
+);
+
 app.use(express.json());
 
-// === CORS: mở cho tất cả origin ===
+// CORS
 app.use(cors());
 app.options("*", cors());
 
@@ -32,30 +40,32 @@ app.use(
   })
 );
 
-// --- health ---
+// Health & sample routes ...
 app.get("/health", (_, res) => res.json({ ok: true }));
+app.get("/api/profile", auth(), (req, res) =>
+  res.json({ message: "OK", user: req.user })
+);
+app.get("/api/admin/secret", auth("admin"), (req, res) =>
+  res.json({ secret: "only-for-admins", user: req.user })
+);
 
-// ví dụ route cần xác thực (đính kèm role, expires trong JWT)
-app.get("/api/profile", auth(), (req, res) => {
-  res.json({ message: "OK", user: req.user });
-});
-
-// ví dụ route chỉ admin mới vào
-app.get("/api/admin/secret", auth("admin"), (req, res) => {
-  res.json({ secret: "only-for-admins", user: req.user });
-});
-
-// --- routes ---
 app.use("/api/auth", authRouter);
-
-// --- mount toàn bộ router device.js dưới /api/device ---
-// Giờ tất cả route: tank, airn2, ahu... sẽ nằm dưới đường dẫn /api/device/...
 app.use("/api/device", deviceRouter);
-
-//route maintenance
 app.use("/api/maintenance", maintanceRouter);
-
 app.use("/api/records", recordsRouter);
+
+// ✅ Static /uploads: đặt CORP= cross-origin (phòng khi proxy khác chèn header)
+const UPLOAD_DIR =
+  process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads");
+app.use(
+  "/uploads",
+  (req, res, next) => {
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    res.setHeader("Access-Control-Allow-Origin", "*"); // không bắt buộc cho <img>, nhưng an toàn
+    next();
+  },
+  express.static(UPLOAD_DIR)
+);
 
 const PORT = process.env.PORT || 4000;
 const MONGODB_URI = process.env.MONGODB_URI;
@@ -64,6 +74,7 @@ connectDB(MONGODB_URI)
   .then(() => {
     app.listen(PORT, "0.0.0.0", () => {
       console.log(`[API] Listening on 0.0.0.0:${PORT}`);
+      console.log(`[API] Static uploads at /uploads -> ${UPLOAD_DIR}`);
     });
   })
   .catch((err) => {
