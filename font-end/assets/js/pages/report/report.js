@@ -2,7 +2,10 @@
 import { renderFilterReport } from "./filterAHU.js";
 import { renderDailyWorkReport } from "./dailywork.js";
 import { renderInnovateReport } from "./innovateReport.js";
-import { renderIncidentReport } from "./incidentReport.js";
+import {
+  renderMaintenanceReport,
+  submitMaintenanceReport,
+} from "./maintenanceReport.js";
 
 export async function renderMaintenance() {
   return `
@@ -15,15 +18,18 @@ export async function renderMaintenance() {
             <option value="filterAHU">Báo cáo thay thế OA filter</option>
             <option value="dailywork">Báo cáo công việc hàng ngày</option>
             <option value="innovateReport">Báo cáo cải tiến</option>
-            <option value="incidentReport">Báo cáo sự cố</option>
+            <option value="maintenanceReport">Lịch sử sửa chữa bảo dưỡng</option>
           </select>
         </label>
         
         <label style="font-weight:600">Ngày:
           <input type="date" id="filter-date" style="padding:8px 10px; border:1px solid #ddd; border-radius:8px" />
         </label>
+        <button id="add-task-btn" class="btn primary" style="padding:8px 12px; background-color: #1976d2; color:white; border:none; border-radius: 4px; cursor:pointer; display:none">
+          ➕ Thêm nội dung
+        </button>
 
-        <div style="display: flex; gap: 10px; margin-left: 900px">
+        <div id="switch-btn" style="display: flex; gap: 10px; margin-left: 900px">
           <button id="edit-report" class="btn primary" style="
             padding: 8px 20px; 
             border-radius: 8px; 
@@ -94,20 +100,25 @@ export function setupReportEvents() {
   const yyyy = today.getFullYear();
   const mm = String(today.getMonth() + 1).padStart(2, "0");
   const dd = String(today.getDate()).padStart(2, "0");
-  dateInput.value = `${yyyy}-${mm}-${dd}`;
+
+  if (select.value !== "maintenanceReport") {
+    dateInput.value = `${yyyy}-${mm}-${dd}`;
+  } else {
+    dateInput.value = ""; // maintenanceReport: không tự set hôm nay
+  }
 
   const map = {
     filterAHU: renderFilterReport,
     dailywork: renderDailyWorkReport,
     innovateReport: renderInnovateReport,
-    incidentReport: renderIncidentReport,
+    maintenanceReport: renderMaintenanceReport,
   };
 
   const titles = {
     filterAHU: "BÁO CÁO THAY THẾ OA FILTER",
     dailywork: "BÁO CÁO CÔNG VIỆC HÀNG NGÀY",
     innovateReport: "BÁO CÁO CẢI TIẾN",
-    incidentReport: "BÁO CÁO SỰ CỐ",
+    maintenanceReport: "LỊCH SỬ SỬA CHỮA BẢO DƯỠNG",
   };
 
   // Hàm format ngày yyyy-MM-dd => yyyy/MM/dd
@@ -117,32 +128,100 @@ export function setupReportEvents() {
   }
 
   async function renderSelectedReport() {
-    const type = select.value;
-    const date = dateInput.value; // yyyy-MM-dd hoặc rỗng
+    const type = select.value; // filterAHU | dailywork | innovateReport | maintenanceReport
 
-    // Format lại ngày thành yyyy/MM/dd
-    const formattedDate = formatDateToSlash(date);
+    const date = dateInput.value; // yyyy-MM-dd
+    const titleText = titles[type] || "";
+    const formattedDate = formatDateToSlash(date); // yyyy/MM/dd
 
-    // Cập nhật tiêu đề
-    title.textContent =
-      titles[type] + (formattedDate ? ` - ${formattedDate}` : "");
-
-    const fn = map[type];
-    if (fn) {
-      const html = await fn(date); // Gửi ngày định dạng yyyy-MM-dd cho backend hoặc hàm xử lý
-      container.innerHTML = html;
+    // 1) Cập nhật tiêu đề
+    if (titleText !== "LỊCH SỬ SỬA CHỮA BẢO DƯỠNG") {
+      title.textContent =
+        titleText + (formattedDate ? ` - ${formattedDate}` : "");
     } else {
-      container.innerHTML = "<p>Không có dữ liệu</p>";
+      title.textContent = titleText;
+    }
+
+    // 2) Reset về chế độ xem (view mode) cho thanh công cụ
+    const addBtnEl = document.getElementById("add-task-btn");
+    const editBtnEl = document.getElementById("edit-report");
+    const updateBtnEl = document.getElementById("update-report");
+    const exitBtnEl = document.getElementById("exit");
+    const switchWrap = document.getElementById("switch-btn");
+
+    if (addBtnEl) addBtnEl.style.display = "none";
+    if (editBtnEl) editBtnEl.style.display = "inline-flex";
+    if (updateBtnEl) updateBtnEl.style.display = "none";
+    if (exitBtnEl) exitBtnEl.style.display = "none";
+    if (switchWrap) switchWrap.style.marginLeft = "900px";
+
+    // 3) Hiển thị trạng thái loading
+    container.innerHTML = `
+    <div style="padding:16px; text-align:center; opacity:0.8;">
+      Đang tải báo cáo...
+    </div>
+  `;
+
+    // 4) Render báo cáo theo type
+    const fn = map[type];
+    try {
+      if (typeof fn === "function") {
+        const html = await fn(date); // truyền yyyy-MM-dd
+        container.innerHTML = html;
+
+        // 4.1) Nếu là maintenanceReport: luôn đảm bảo vào view mode (không có cột thao tác)
+        //      => gỡ hoàn toàn cột "Thao tác" nếu có
+        if (
+          type === "maintenanceReport" &&
+          typeof window.__setMaintenanceEditMode === "function"
+        ) {
+          window.__setMaintenanceEditMode(false);
+        }
+      } else {
+        container.innerHTML = "<p style='padding:12px'>Không có dữ liệu</p>";
+      }
+    } catch (err) {
+      console.error("[renderSelectedReport] error:", err);
+      container.innerHTML = `
+      <div style="padding:12px; color:#b00020;">
+        Lỗi khi tải báo cáo. Vui lòng thử lại.
+      </div>
+    `;
     }
   }
 
-  select.addEventListener("change", renderSelectedReport);
+  select.addEventListener("change", () => {
+    const type = select.value;
+
+    if (type === "maintenanceReport") {
+      // maintenance: không auto điền — để trống để user tự chọn
+      dateInput.value = "";
+    } else {
+      // các loại khác: auto hôm nay
+      const today = new Date();
+      const yyyy = today.getFullYear();
+      const mm = String(today.getMonth() + 1).padStart(2, "0");
+      const dd = String(today.getDate()).padStart(2, "0");
+      dateInput.value = `${yyyy}-${mm}-${dd}`;
+    }
+    renderSelectedReport();
+  });
   dateInput.addEventListener("change", renderSelectedReport);
 
   editBtn.addEventListener("click", async () => {
     document.getElementById("edit-report").style.display = "none";
     document.getElementById("update-report").style.display = "inline-flex";
     document.getElementById("exit").style.display = "inline-flex";
+
+    // Nếu báo cáo đang chọn là maintenanceReport thì hiện nút thêm nội dung
+    if (select.value === "maintenanceReport") {
+      document.getElementById("add-task-btn").style.display = "flex";
+      document.getElementById("switch-btn").style.marginLeft = "744px";
+      window.__setMaintenanceEditMode?.(true);
+    } else {
+      document.getElementById("add-task-btn").style.display = "none";
+      document.getElementById("switch-btn").style.marginLeft = "900px";
+    }
     window.currentReportEnableEdit();
   });
 
@@ -162,6 +241,8 @@ export function setupReportEvents() {
       if (type === "filterAHU") {
         // LƯU Ý: currentReportCollectAndSubmit nên throw Error(message) có kèm status/text nếu fail
         await window.currentReportCollectAndSubmit(date);
+      } else if (type === "maintenanceReport") {
+        await submitMaintenanceReport(date);
       } else {
         console.warn(`${logPrefix} - no submit handler for type="${type}"`);
         alert("Chưa gắn submit cho loại báo cáo này.");
@@ -169,11 +250,16 @@ export function setupReportEvents() {
       }
 
       console.info(`${logPrefix} - success in ${Date.now() - startedAt}ms`);
-      alert("Cập nhật thành công!");
 
       document.getElementById("update-report").style.display = "none";
       document.getElementById("exit").style.display = "none";
       document.getElementById("edit-report").style.display = "inline-flex";
+      document.getElementById("add-task-btn").style.display = "none";
+      document.getElementById("switch-btn").style.marginLeft = "900px";
+
+      // 👉 Tắt edit mode cho bảng bảo dưỡng (gỡ cột Thao tác)
+      if (type === "maintenanceReport")
+        window.__setMaintenanceEditMode?.(false);
 
       // Reload lại đúng ngày đang chọn (sẽ hiển thị dữ liệu vừa upsert)
       const changeEvent = new Event("change");
@@ -205,6 +291,12 @@ export function setupReportEvents() {
     document.getElementById("update-report").style.display = "none";
     document.getElementById("exit").style.display = "none";
     document.getElementById("edit-report").style.display = "inline-flex";
+    document.getElementById("add-task-btn").style.display = "none";
+    document.getElementById("switch-btn").style.marginLeft = "900px";
+
+    if (select.value === "maintenanceReport")
+      window.__setMaintenanceEditMode?.(false);
+
     await renderSelectedReport();
   });
 

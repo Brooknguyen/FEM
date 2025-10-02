@@ -1,4 +1,4 @@
-// src/models/PlanSheets.js
+// src/models/PlanSheets.js file kế hoạch bảo dưỡng
 import mongoose from "mongoose";
 
 /** Dùng lại point r/c cho cả merge và wrap-cells */

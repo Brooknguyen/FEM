@@ -13,6 +13,7 @@ import deviceRouter from "./routes/device.js";
 import maintanceRouter from "./routes/maintenance.js";
 import { auth } from "./middleware/auth.js";
 import recordsRouter from "./routes/records.js";
+import mainreportRouter from "./routes/mainreport.js";
 
 const app = express();
 
@@ -48,11 +49,16 @@ app.get("/api/profile", auth(), (req, res) =>
 app.get("/api/admin/secret", auth("admin"), (req, res) =>
   res.json({ secret: "only-for-admins", user: req.user })
 );
-
+//Login
 app.use("/api/auth", authRouter);
+//Thong tin máy
 app.use("/api/device", deviceRouter);
+//kế hoạch bảo dưỡng bảo trì theo năm
 app.use("/api/maintenance", maintanceRouter);
+//thay filter OA AHU hàng ngày
 app.use("/api/records", recordsRouter);
+//Lịch sử bảo dưỡng máy
+app.use("/api/mainreport", mainreportRouter);
 
 // ✅ Static /uploads: đặt CORP= cross-origin (phòng khi proxy khác chèn header)
 const UPLOAD_DIR =
