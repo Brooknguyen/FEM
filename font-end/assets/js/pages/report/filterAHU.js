@@ -155,14 +155,13 @@ export async function renderFilterReport(date) {
       <td>${item.content}</td>
 
       <td>
-        <select id="result-${index}" disabled style="padding:6px 8px; border:none; border-radius:6px; background-color: transparent; color: var(--fg);">
-          <option value="OK" style="background-color:green" ${
-            item.result === "OK" ? "selected" : ""
-          }>OK</option>
-          <option value="NG" style="background-color:red" ${
-            item.result === "NG" ? "selected" : ""
-          }>NG</option>
-        </select>
+        <input
+          id="result-${index}"
+          type="text"
+          value="${item.result || "OK"}"
+          disabled
+          style="padding:6px 8px; border:none; border-radius:6px; background-color: transparent; color: var(--fg); width: 60px"
+        />
       </td>
 
       <td>

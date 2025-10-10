@@ -1,10 +1,7 @@
 // router.js
 import { renderInfoRoute } from "./pages/info/index.js";
 import { renderPlanRoute } from "./pages/plan/index_plan.js";
-import {
-  renderMaintenance,
-  setupReportEvents
-} from "./pages/report/report.js";
+import { renderMaintenance, setupReportEvents } from "./pages/report/report.js";
 import { renderCrudInfoRoute } from "./pages/crud_info/crud.index.js";
 import { renderCrudPlanRoute } from "./pages/crud_plan/crud.index.plan.js";
 import {
@@ -13,7 +10,7 @@ import {
   bindLoginEvents,
   bindRegisterEvents,
 } from "./login/login.js";
-
+import { renderTodoPage, setupTodoEvents } from "./pages/to-do/toDo.js";
 
 const isAuthed = () =>
   !!sessionStorage.getItem("auth_token") ||
@@ -136,10 +133,15 @@ export async function renderRoute() {
 
   if (path === "/report") {
     await setHTML(main, renderMaintenance());
-    setupReportEvents();;
+    setupReportEvents();
     return;
   }
 
+  if (path === "/todo") {
+    await setHTML(main, renderTodoPage());
+    setupTodoEvents();
+    return;
+  }
 
   navigate("/info/air");
 }

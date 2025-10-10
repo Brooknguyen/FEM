@@ -87,6 +87,7 @@ export function renderSidebar() {
     </div>
 
     ${item("#/report", "i-alert", "Báo cáo")}
+    ${item("#/todo", "i-toDo", "To-Do List")}
   </aside>`;
 }
 
@@ -138,32 +139,39 @@ function closeProfilePopup() {
 }
 
 export function renderUserProfilePopup() {
-  const user = JSON.parse(
-    localStorage.getItem("user_info") ||
-      sessionStorage.getItem("user_info") ||
-      "null"
-  );
+  const user =
+    JSON.parse(
+      localStorage.getItem("user_info") ||
+        sessionStorage.getItem("user_info") ||
+        "null"
+    ) || {};
+
+  const fullName = `${(user.firstName || "").trim()} ${(
+    user.lastName || ""
+  ).trim()}`;
+  const empCode = user.code || "";
 
   return `
-    <div class="user-profile-popup" id="user-profile-popup">
-      <div class="profile-header">
-        <span style="color = #333" >${user?.role?.toUpperCase()} PROFILE</span>
-        <button class="close-btn" id="close-profile-popup">&times;</button>
+    <div class="profile-card" id="user-profile-popup" style="position:fixed; top:56px; right:16px; z-index:1000;">
+      <div class="pc-header">
+        <button class="pc-close" id="close-profile-popup" aria-label="Đóng">×</button>
       </div>
-      <div class="profile-body">
-        <img class="profile-avatar" src="assets/pictures/user.png" alt="avatar">
-        <div class="profile-info">
-          <div class="profile-value"><b>${user?.firstName || ""} ${
-    user?.lastName || ""
-  }</b></div>
-          <div class="profile-value">${user?.code || ""}</div>
+
+      <div class="pc-body">
+        <div class="pc-avatar"></div>
+        <div class="pc-name">
+          <div class="pc-full">${fullName}</div>
+          <div class="pc-handle">${empCode}</div>
         </div>
       </div>
-          
-      <div class="profile-footer">
-        <button class="btn btn-logout" id="btn-logout-popup"><span class="i-exit"></span> Logout</button>
+
+      <div class="pc-menu">
+        <button class="pc-item danger" id="btn-logout-popup">
+          <span class="i-exit" style="margin-right:8px"></span>Log out
+        </button>
       </div>
     </div>
+
     <div class="profile-popup-overlay" id="profile-popup-overlay"></div>
   `;
 }

@@ -214,7 +214,7 @@ body.dark-theme .side-item.active{ background:color-mix(in oklab, var(--primary)
 .side-item .label{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 /* Icons (mask) inherit currentColor */
 .i-burger, .i-bell, .i-chat, .i-help, .i-flag, .i-home, .i-system, .i-report, .i-alert, .i-support,
-.i-sun, .i-moon{
+.i-sun, .i-moon, .i-toDo{
   width:18px; height:18px; display:inline-block; background:currentColor;
   mask-position:center; mask-repeat:no-repeat; mask-size:contain;
 }
@@ -234,12 +234,22 @@ body.dark-theme .side-item.active{ background:color-mix(in oklab, var(--primary)
 }
 .i-home   { mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 10l9-7 9 7v10a2 2 0 0 1-2 2h-5V12H10v10H5a2 2 0 0 1-2-2z" stroke="black" stroke-width="2" fill="none"/></svg>'); }
 .i-system { mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="black" stroke-width="2" fill="none"/><path d="M12 3v18M3 12h18" stroke="black" stroke-width="2"/></svg>'); }
-.i-report { mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7 3h10v4h4v14H3V3h4z" stroke="black" stroke-width="2" fill="none"/><path d="M7 3v4h10" stroke="black" stroke-width="2"/></svg>'); }
-.i-alert  { mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10.3 3.1l-9 15.6A2 2 0 003.1 22h17.8a2 2 0 001.8-3.3L13.7 3.1a2 2 0 00-3.4 0zM12 9v4m0 4h.01" stroke="black" stroke-width="2" fill="none"/></svg>'); }
+.i-report {
+  mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 25" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83l-1.4 1.4a2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2H9a2 2 0 01-2-2v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0l-1.4-1.4a2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2V9a2 2 0 012-2h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83l1.4-1.4a2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2h2a2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0l1.4 1.4a2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2v2a2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg>');
+}
+.i-alert {
+  mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="black" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="20" height="20" rx="2"/><path d="M7 17v-5M12 17v-8M17 17v-3"/></svg>');
+}
+
 .i-support{ mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="black" stroke-width="2" fill="none"/><path d="M8 15a4 4 0 018 0" stroke="black" stroke-width="2"/><circle cx="12" cy="10" r="2" fill="black"/></svg>'); }
 /* theme icons */
 .i-sun { mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" stroke="black" stroke-width="2" fill="none"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" stroke="black" stroke-width="2"/></svg>'); }
 .i-moon{ mask-image:url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 109.8 9.8z" stroke="black" stroke-width="2" fill="none"/></svg>'); }
+.i-toDo {
+  mask-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2" ry="2"/><path d="M8 8h8M8 12h8M8 16h5M5 8l1.5 1.5L8 8"/></svg>');
+}
+
+
 
 .avatar img{ width:32px; height:32px; border-radius:50%; display:block; }
 
