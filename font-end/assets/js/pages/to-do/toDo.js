@@ -266,21 +266,82 @@ export function setupTodoEvents() {
   const API = {
     cards: `${API_ORIGIN}/api/kanban/cards`,
     comments: `${API_ORIGIN}/api/kanban/comments`,
+    archiveDone: `${API_ORIGIN}/api/kanban/archive-done`,
+    history: `${API_ORIGIN}/api/kanban/history`,
   };
 
   // Socket.IO client (đảm bảo <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>)
+  const SOCKET_PATH = "/socket.io";
   const socket = window.io
-    ? window.io(API_ORIGIN, { transports: ["websocket"] })
+    ? window.io(API_ORIGIN, {
+        path: SOCKET_PATH,
+        transports: ["websocket"], //ưu tiên websocket
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        timeout: 8000,
+        withCredidentials: false,
+      })
     : null;
+
   let MY_SID = null;
+  // sau khi khởi tạo socket:
   if (socket) {
     socket.on("connect", () => {
       MY_SID = socket.id;
+      console.log("[socket] connected", MY_SID);
       socket.emit("join", { boardId: BOARD_ID });
     });
+    socket.on("disconnect", (reason) => {
+      console.warn("[socket] disconnected:", reason);
+    });
+    socket.on("connect_error", (err) =>
+      console.warn("[socket] connect_error:", err?.message || err)
+    );
+    socket.on("error", (err) => console.warn("[socket] error:", err));
+  } else {
+    console.error("[socket] window.io not found. Load the CDN script first.");
   }
 
-  /* ====== QUYỀN (chỉ ảnh hưởng nút xoá thẻ / sửa mô tả) ====== */
+  // ===== Comments: Enter to send =====
+  detailCmtInput.addEventListener("keydown", (e) => {
+    // Nếu đang gõ tiếng Việt (IME), Enter sẽ chỉ kết thúc tổ hợp — đừng gửi
+    if (e.isComposing) return;
+
+    const isEnter =
+      e.key === "Enter" || e.key === "NumpadEnter" || e.code === "Enter";
+
+    if (isEnter && !e.shiftKey) {
+      e.preventDefault();
+
+      const text = (detailCmtInput.value || "").trim();
+      const cardId = detail.dataset.cardId;
+
+      if (!cardId) {
+        console.warn("[comment] missing cardId on detail panel");
+        return;
+      }
+      if (!text) return;
+
+      if (!socket || socket.disconnected) {
+        alert("Không thể gửi bình luận: Socket chưa kết nối tới server.");
+        return;
+      }
+
+      console.log("[comment:add] emit", { boardId: BOARD_ID, cardId, text });
+      socket.emit("comment:add", { boardId: BOARD_ID, cardId, text }, (ack) => {
+        // Server nên gọi callback với {ok:true} hoặc {ok:false,message}
+        if (!ack || ack.ok !== true) {
+          alert("Gửi bình luận lỗi: " + (ack?.message || "unknown"));
+          return;
+        }
+        // Xoá input; UI sẽ được cập nhật bằng broadcast 'comment:added'
+        detailCmtInput.value = "";
+      });
+    }
+  });
+
+  /* ====== QUYỀN ====== */
   const IS_ADMIN = (() => {
     try {
       const raw =
@@ -322,19 +383,6 @@ export function setupTodoEvents() {
   const fmtDate = (s) => (s ? new Date(s).toLocaleDateString() : "");
   const fmtDateTime = (s) => (s ? new Date(s).toLocaleString() : "");
 
-  function currentUserName() {
-    try {
-      const raw =
-        sessionStorage.getItem("user_info") ||
-        localStorage.getItem("user_info");
-      if (!raw) return "You";
-      const u = JSON.parse(raw);
-      const full = [u.firstName, u.lastName].filter(Boolean).join(" ").trim();
-      return full || u.code || "You";
-    } catch {
-      return "You";
-    }
-  }
   function getCardRef(id) {
     for (const list of ["todo", "doing", "done"]) {
       const idx = data[list].findIndex((c) => c.id === id);
@@ -343,7 +391,7 @@ export function setupTodoEvents() {
     return null;
   }
 
-  /* ====== API CALLS (chỉ làm việc với giá trị card) ====== */
+  /* ====== API: Cards ====== */
   async function apiGetBoard() {
     try {
       const res = await fetch(
@@ -359,7 +407,7 @@ export function setupTodoEvents() {
         label: x.label || "",
         due: x.due || "",
         desc: x.desc || "",
-        comments: [], // load khi mở chi tiết
+        comments: [],
       }));
       return {
         todo: cards
@@ -371,7 +419,7 @@ export function setupTodoEvents() {
         done: cards
           .filter((c) => c.list === "done")
           .sort((a, b) => a.order - b.order),
-        archive: [], // client-only
+        archive: [],
       };
     } catch (e) {
       console.warn("[kanban] load cards error:", e);
@@ -386,7 +434,7 @@ export function setupTodoEvents() {
     });
     const j = await res.json();
     if (!res.ok || !j.ok) throw new Error(j.message || "create failed");
-    return j.data; // mongo doc
+    return j.data;
   }
   async function apiUpdateCard(id, fields) {
     const res = await fetch(`${API.cards}/${id}`, {
@@ -413,14 +461,93 @@ export function setupTodoEvents() {
     const j = await res.json();
     if (!res.ok || !j.ok) throw new Error(j.message || "delete failed");
   }
-
-  // re-index cả list sau khi thả để thứ tự bền vững khi reload
   async function apiBulkReorder(listName) {
     const items = data[listName];
     await Promise.all(items.map((c, idx) => apiMoveCard(c.id, listName, idx)));
   }
 
-  /* ====== SOCKET: COMMENTS realtime ====== */
+  /* ====== API: History ====== */
+  async function apiArchiveDone() {
+    const res = await fetch(API.archiveDone, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ boardId: BOARD_ID }),
+    });
+    const j = await res.json();
+    if (!res.ok || !j.ok) throw new Error(j.message || "archive-done failed");
+    return j;
+  }
+  async function apiGetHistory() {
+    const res = await fetch(
+      `${API.history}?boardId=${encodeURIComponent(BOARD_ID)}`
+    );
+    const j = await res.json();
+    if (!res.ok || !j.ok) throw new Error(j.message || "get history failed");
+    return (j.data || []).map((r) => ({
+      id: r.id || r._id,
+      title: r.title || "",
+      label: r.label || "",
+      due: r.due || null,
+      // fallback nếu BE cũ ghi sai key
+      completedAt: r.completedAt || r.complertedAt || null,
+      desc: r.desc || "",
+    }));
+  }
+  async function apiClearHistory() {
+    const res = await fetch(
+      `${API.history}?boardId=${encodeURIComponent(BOARD_ID)}`,
+      { method: "DELETE" }
+    );
+    const j = await res.json();
+    if (!res.ok || !j.ok) throw new Error(j.message || "history delete failed");
+    return j;
+  }
+  async function loadArchiveAndRender() {
+    try {
+      data.archive = await apiGetHistory();
+    } catch (e) {
+      console.warn("[kanban] load history error:", e);
+      data.archive = [];
+    }
+    renderArchive();
+  }
+
+  /* ====== BUTTON: Update (archive DONE) ====== */
+  document
+    .querySelector("#kb-clear-done")
+    ?.addEventListener("click", async () => {
+      if (!data.done.length) return;
+      if (!confirm("Move completed cards to history and delete from board?"))
+        return;
+      try {
+        await apiArchiveDone();
+        const fresh = await apiGetBoard();
+        data.todo = fresh.todo;
+        data.doing = fresh.doing;
+        data.done = fresh.done;
+        await loadArchiveAndRender();
+        render();
+      } catch (e) {
+        alert("Archive failed: " + e.message);
+      }
+    });
+
+  /* ====== BUTTON: Delete History ====== */
+  document
+    .querySelector("#kb-archive-clear")
+    ?.addEventListener("click", async () => {
+      if (!data.archive?.length) return;
+      if (!confirm("Delete all completed history?")) return;
+      try {
+        await apiClearHistory();
+        data.archive = [];
+        renderArchive();
+      } catch (e) {
+        alert("Clear history failed: " + e.message);
+      }
+    });
+
+  /* ====== SOCKET: Comments realtime ====== */
   if (socket) {
     socket.on("comment:added", ({ boardId, cardId, comment }) => {
       if (boardId !== BOARD_ID) return;
@@ -439,30 +566,30 @@ export function setupTodoEvents() {
     });
   }
 
-  /* ====== RENDER ARCHIVE (client-only) ====== */
+  /* ====== RENDER: History ====== */
   function renderArchive() {
     if (!archBody) return;
     const rows = (data.archive || [])
       .map(
         (a) => `
-        <tr>
-          <td>${esc(a.title || "")}</td>
-          <td>${
-            a.label
-              ? `<span class="arch-label" style="background:${a.label}"></span>`
-              : ""
-          }</td>
-          <td>${a.due ? esc(a.due) : ""}</td>
-          <td>${a.completedAt ? esc(fmtDateTime(a.completedAt)) : ""}</td>
-          <td class="desc">${esc(a.desc || "")}</td>
-        </tr>`
+      <tr>
+        <td>${esc(a.title || "")}</td>
+        <td>${
+          a.label
+            ? `<span class="arch-label" style="background:${a.label}"></span>`
+            : ""
+        }</td>
+        <td>${a.due ? esc(fmtDate(a.due)) : ""}</td>
+        <td>${a.completedAt ? esc(fmtDateTime(a.completedAt)) : ""}</td>
+        <td class="desc">${esc(a.desc || "")}</td>
+      </tr>`
       )
       .join("");
     archBody.innerHTML =
       rows || `<tr><td class="arch-empty" colspan="5">Empty.</td></tr>`;
   }
 
-  /* ====== RENDER BOARD ====== */
+  /* ====== RENDER: Board ====== */
   function render() {
     const total = data.todo.length + data.doing.length + data.done.length;
     if (stats)
@@ -507,7 +634,6 @@ export function setupTodoEvents() {
               async (e) => {
                 e.stopPropagation();
                 await apiDeleteCard(id);
-                // xoá ở client state
                 for (const k of ["todo", "doing", "done"]) {
                   const i = data[k].findIndex((c) => c.id === id);
                   if (i > -1) data[k].splice(i, 1);
@@ -518,7 +644,7 @@ export function setupTodoEvents() {
             );
           }
 
-          // DRAG cho mọi user
+          // drag
           el.addEventListener("dragstart", (e) => {
             drag = {
               id,
@@ -548,10 +674,8 @@ export function setupTodoEvents() {
         cardsEl.addEventListener("drop", async () => {
           if (!drag.id) return;
           moveTo(listName, drag.overIndex);
-          const moved = getCardRef(drag.id);
-          // cập nhật DB: set list & order
           await apiMoveCard(drag.id, listName, drag.overIndex);
-          await apiBulkReorder(listName); // đảm bảo thứ tự bền vững
+          await apiBulkReorder(listName);
           drag = {
             id: null,
             from: null,
@@ -568,7 +692,7 @@ export function setupTodoEvents() {
     renderArchive();
   }
 
-  /* ===== Composer (admin only) ===== */
+  /* ====== Composer (admin only) ====== */
   if (IS_ADMIN) {
     board.addEventListener("click", async (e) => {
       const box = e.target.closest("[data-composer]");
@@ -612,7 +736,7 @@ export function setupTodoEvents() {
         const payload = {
           title,
           label: label?.value || "",
-          due: due?.value || "",
+          due: dueVal, // ✅ dùng dueVal
           desc: "",
         };
         const created = await apiCreateCard(listName, payload);
@@ -645,7 +769,7 @@ export function setupTodoEvents() {
     });
   }
 
-  /* ===== Detail panel ===== */
+  /* ====== Detail panel ====== */
   function openDetail(id) {
     opened = { id, list: getCardRef(id)?.list || null };
     fillDetail(id);
@@ -671,7 +795,7 @@ export function setupTodoEvents() {
         author: c.author || "Guest",
         text: c.text || "",
         ts: c.ts,
-        sid: c.sid, // nếu server có gửi
+        sid: c.sid,
       }));
       ref.card._cmtLoaded = true;
     } catch (e) {
@@ -694,7 +818,7 @@ export function setupTodoEvents() {
 
     detailActivity.innerHTML = (c.comments || [])
       .map((cm) => {
-        const canDel = (cm.sid && MY_SID && cm.sid === MY_SID) || false; // server nên gửi sid
+        const canDel = (cm.sid && MY_SID && cm.sid === MY_SID) || false;
         const delBtn = canDel
           ? `<button class="cmt-dot" data-cmt-del="${esc(
               cm.cid
@@ -723,7 +847,7 @@ export function setupTodoEvents() {
     if (e.key === "Escape" && detail.classList.contains("open")) closeDetail();
   });
 
-  // Ghi dữ liệu: admin-only với title/desc/label/due → cập nhật DB
+  // Admin-only: cập nhật title/desc/label/due
   detailTitle.addEventListener("blur", async () => {
     if (!IS_ADMIN) return;
     const id = detail.dataset.cardId;
@@ -763,18 +887,8 @@ export function setupTodoEvents() {
     render();
   });
 
-  // === COMMENT: mọi người có thể comment (server gắn cid/ts/author/sid) ===
-  detailCmtInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      const text = (detailCmtInput.value || "").trim();
-      if (!text || !socket) return;
-      const cardId = detail.dataset.cardId;
-      socket.emit("comment:add", { boardId: BOARD_ID, cardId, text }, () => {});
-      detailCmtInput.value = "";
-    }
-  });
-  // XÓA bình luận — server kiểm tra quyền bằng socket.id
+  // Comments
+
   detailActivity.addEventListener("click", (e) => {
     const btn = e.target.closest("[data-cmt-del]");
     if (!btn || !socket) return;
@@ -783,7 +897,7 @@ export function setupTodoEvents() {
     socket.emit("comment:remove", { boardId: BOARD_ID, cardId, cid }, () => {});
   });
 
-  /* ===== Drag helpers ===== */
+  // Drag helpers
   function cleanupPlaceholders() {
     document
       .querySelectorAll("#kb-board .placeholder")
@@ -830,58 +944,11 @@ export function setupTodoEvents() {
     cleanupPlaceholders();
   }
 
-  /* ===== Clear buttons (admin only) ===== */
-  if (IS_ADMIN) {
-    document
-      .querySelector("#kb-clear-done")
-      ?.addEventListener("click", async () => {
-        if (!data.done.length) return;
-        if (!confirm("Move completed cards to history and delete from board?"))
-          return;
-        const now = Date.now();
-        data.archive ||= [];
-        for (const c of data.done) {
-          data.archive.unshift({
-            id: c.id,
-            title: c.title,
-            label: c.label || "",
-            due: c.due || "",
-            desc: c.desc || "",
-            completedAt: now,
-          });
-          await apiDeleteCard(c.id); // xóa khỏi DB
-        }
-        data.done = [];
-        render();
-      });
-
-    document
-      .querySelector("#kb-clear-all")
-      ?.addEventListener("click", async () => {
-        if (!(data.todo.length || data.doing.length || data.done.length))
-          return;
-        if (!confirm("Delete all the cards on board?")) return;
-        const all = [...data.todo, ...data.doing, ...data.done];
-        await Promise.all(all.map((c) => apiDeleteCard(c.id)));
-        data = { todo: [], doing: [], done: [], archive: data.archive || [] };
-        closeDetail();
-        render();
-      });
-
-    document
-      .querySelector("#kb-archive-clear")
-      ?.addEventListener("click", () => {
-        if (!data.archive?.length) return;
-        if (!confirm("Delete all completed history?")) return;
-        data.archive = []; // history chỉ lưu client
-        renderArchive();
-      });
-  }
-
-  /* ===== INITIAL LOAD ===== */
+  /* ====== INITIAL LOAD ====== */
   (async () => {
     data = await apiGetBoard();
     render();
+    await loadArchiveAndRender();
   })();
 }
 

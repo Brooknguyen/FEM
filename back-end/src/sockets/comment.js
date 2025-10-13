@@ -1,29 +1,30 @@
+// sockets/comment.js
+import mongoose from "mongoose";
 import KanbanComment from "../models/KanbanComment.js";
 
-/**
- * WebSocket cho comment: chỉ nhận/ghi nội dung comment,
- * không trả về/không lưu toàn bộ card.
- */
 export function initCommentSockets(io) {
   io.on("connection", (socket) => {
-    // join theo board để broadcast gọn
     socket.on("join", ({ boardId = "default" } = {}) => {
       socket.join(`board:${boardId}`);
     });
 
-    // thêm bình luận
     socket.on("comment:add", async (payload = {}, ack) => {
       try {
-        const { boardId = "default", cardId, cid, text, author, ts } = payload;
+        const { boardId = "default", cardId, text } = payload;
         if (!cardId || !text) {
           return ack?.({ ok: false, message: "cardId & text are required" });
         }
+
+        // ✅ cast cardId sang ObjectId đúng với schema
+        const cardObjectId = new mongoose.Types.ObjectId(cardId);
+
         const doc = await KanbanComment.create({
-          cardId,
-          cid: cid || undefined,
+          // boardId, // nếu bạn muốn lưu theo board, mở comment này + thêm field vào schema
+          cardId: cardObjectId,
           text: String(text),
-          author: author || "You",
-          ts: ts ? new Date(ts) : new Date(),
+          author: "Guest",
+          ts: new Date(),
+          sid: socket.id,
         });
 
         const comment = {
@@ -31,9 +32,14 @@ export function initCommentSockets(io) {
           author: doc.author,
           text: doc.text,
           ts: doc.ts,
+          sid: doc.sid,
         };
 
-        io.to(`board:${boardId}`).emit("comment:added", { cardId, comment });
+        io.to(`board:${boardId}`).emit("comment:added", {
+          boardId,
+          cardId, // FE vẫn dùng string id — ok
+          comment,
+        });
         ack?.({ ok: true, data: comment });
       } catch (e) {
         console.error("[ws comment:add]", e);
@@ -41,21 +47,32 @@ export function initCommentSockets(io) {
       }
     });
 
-    // xóa bình luận (theo cid hoặc _id)
     socket.on("comment:remove", async (payload = {}, ack) => {
       try {
         const { boardId = "default", cardId, cid } = payload;
-        if (!cardId || !cid)
+        if (!cardId || !cid) {
           return ack?.({ ok: false, message: "cardId & cid are required" });
+        }
 
-        const removed = await KanbanComment.findOneAndDelete({
-          cardId,
+        const cardObjectId = new mongoose.Types.ObjectId(cardId);
+
+        // Tìm theo cid hoặc _id
+        const found = await KanbanComment.findOne({
+          cardId: cardObjectId,
           $or: [{ cid }, { _id: cid }],
         });
+        if (!found) return ack?.({ ok: false, message: "Comment not found" });
 
-        if (!removed) return ack?.({ ok: false, message: "Comment not found" });
+        // nếu muốn chặn người khác xoá:
+        // if (found.sid && found.sid !== socket.id) return ack?.({ ok:false, message:"Not allowed" });
 
-        io.to(`board:${boardId}`).emit("comment:removed", { cardId, cid });
+        await KanbanComment.deleteOne({ _id: found._id });
+
+        io.to(`board:${boardId}`).emit("comment:removed", {
+          boardId,
+          cardId,
+          cid,
+        });
         ack?.({ ok: true });
       } catch (e) {
         console.error("[ws comment:remove]", e);

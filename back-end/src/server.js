@@ -24,7 +24,6 @@ import inspectionReportRouter from "./routes/inspectionreport.js";
 // Kanban (REST) + Socket handlers
 import kanbanRouter from "./routes/kanban.js";
 
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -84,6 +83,8 @@ app.use("/api/mainreport", mainreportRouter);
 app.use("/api/device-inspection", inspectionReportRouter);
 // Kanban (board + comments REST)
 app.use("/api/kanban", kanbanRouter);
+// Kanban (history REST)
+
 
 /** -------- Static uploads -------- */
 const UPLOAD_DIR =
