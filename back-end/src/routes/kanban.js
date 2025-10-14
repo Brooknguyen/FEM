@@ -224,29 +224,26 @@ router.delete("/history/:id", async (req, res) => {
 //comments API
 // ✅ thay toàn bộ block Comments API hiện tại bằng đoạn này
 
-// GET /api/kanban/comments/:cardId  -> trả về danh sách comment của 1 card
+// src/routes/kanban.js  (thêm/điều chỉnh endpoint này)
 router.get("/comments/:cardId", async (req, res) => {
   try {
     const { cardId } = req.params;
-
-    // Nếu id hợp lệ: query theo ObjectId đúng schema
-    // (Tuỳ chọn) nếu bạn từng lỡ lưu cardId dạng string, có thể thêm fallback như comment bên dưới
-    let filter;
-    if (mongoose.isValidObjectId(cardId)) {
-      filter = { cardId: new mongoose.Types.ObjectId(cardId) };
-    } else {
-      // Fallback (tuỳ chọn) để đọc dữ liệu cũ nếu từng lưu sai kiểu
-      // filter = { cardId };
+    if (!mongoose.isValidObjectId(cardId)) {
       return res.status(400).json({ ok: false, message: "Invalid card id" });
     }
 
-    const rows = await KanbanComment.find(filter)
+    const rows = await KanbanComment.find({ cardId })
       .sort({ ts: -1 })
-      .select("cid author text ts sid")
+      .select("cid author uid text ts")
       .lean();
 
-    // Bổ sung cid nếu thiếu
-    const data = rows.map((r) => ({ ...r, cid: r.cid || String(r._id) }));
+    const data = rows.map((r) => ({
+      cid: r.cid || r._id?.toString(),
+      author: r.author,
+      uid: r.uid || null,
+      text: r.text,
+      ts: r.ts,
+    }));
 
     res.json({ ok: true, data });
   } catch (e) {

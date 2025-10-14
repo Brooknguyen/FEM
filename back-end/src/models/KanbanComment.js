@@ -1,3 +1,4 @@
+// src/models/KanbanComment.js
 import mongoose from "mongoose";
 
 const KanbanCommentSchema = new mongoose.Schema(
@@ -8,9 +9,9 @@ const KanbanCommentSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    // chỉ những gì cần cho 1 comment
-    cid: { type: String, index: true }, // id ngắn phía FE tạo (uid)
-    author: { type: String, default: "You" },
+    cid: { type: String, index: true }, // id ngắn (nếu muốn set từ FE)
+    author: { type: String, default: "You" }, // tên hiển thị
+    uid: { type: String, index: true }, // 👈 ID user ổn định để so sánh quyền
     text: { type: String, required: true },
     ts: { type: Date, default: Date.now },
   },

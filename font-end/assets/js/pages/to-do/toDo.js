@@ -304,40 +304,60 @@ export function setupTodoEvents() {
   }
 
   // ===== Comments: Enter to send =====
-  detailCmtInput.addEventListener("keydown", (e) => {
-    // Nếu đang gõ tiếng Việt (IME), Enter sẽ chỉ kết thúc tổ hợp — đừng gửi
-    if (e.isComposing) return;
+  // Helper: lấy tên hiển thị của user
+  function currentUser() {
+    try {
+      const raw =
+        sessionStorage.getItem("user_info") ||
+        localStorage.getItem("user_info");
+      const u = raw ? JSON.parse(raw) : {};
+      const name =
+        u.name ||
+        [u.firstName, u.lastName].filter(Boolean).join(" ").trim() ||
+        u.username ||
+        u.code ||
+        "Guest";
+      const uid = u.id || u._id || u.userId || u.code || null; // 👈 ID ổn định
+      const role = (u.role || "").toString().toLowerCase();
+      const isAdmin = role === "admin";
+      return { name, uid, isAdmin };
+    } catch {
+      return { name: "Guest", uid: null, isAdmin: false };
+    }
+  }
 
+  const CUR = currentUser();
+
+  detailCmtInput.addEventListener("keydown", (e) => {
+    if (e.isComposing) return;
     const isEnter =
       e.key === "Enter" || e.key === "NumpadEnter" || e.code === "Enter";
-
     if (isEnter && !e.shiftKey) {
       e.preventDefault();
 
       const text = (detailCmtInput.value || "").trim();
       const cardId = detail.dataset.cardId;
-
-      if (!cardId) {
-        console.warn("[comment] missing cardId on detail panel");
-        return;
-      }
-      if (!text) return;
+      if (!cardId || !text) return;
 
       if (!socket || socket.disconnected) {
         alert("Không thể gửi bình luận: Socket chưa kết nối tới server.");
         return;
       }
 
-      console.log("[comment:add] emit", { boardId: BOARD_ID, cardId, text });
-      socket.emit("comment:add", { boardId: BOARD_ID, cardId, text }, (ack) => {
-        // Server nên gọi callback với {ok:true} hoặc {ok:false,message}
-        if (!ack || ack.ok !== true) {
-          alert("Gửi bình luận lỗi: " + (ack?.message || "unknown"));
-          return;
+      const author = CUR.name || "Guest";
+      const uid = CUR.uid || null;
+
+      socket.emit(
+        "comment:add",
+        { boardId: BOARD_ID, cardId, text, author, uid },
+        (ack) => {
+          if (!ack || ack.ok !== true) {
+            alert("Gửi bình luận lỗi: " + (ack?.message || "unknown"));
+            return;
+          }
+          detailCmtInput.value = "";
         }
-        // Xoá input; UI sẽ được cập nhật bằng broadcast 'comment:added'
-        detailCmtInput.value = "";
-      });
+      );
     }
   });
 
@@ -791,11 +811,11 @@ export function setupTodoEvents() {
       const res = await fetch(`${API.comments}/${cardId}`);
       const j = await res.json();
       ref.card.comments = (j.data || []).map((c) => ({
-        cid: c.cid || c._id,
+        cid: c.cid,
         author: c.author || "Guest",
+        uid: c.uid || null,
         text: c.text || "",
         ts: c.ts,
-        sid: c.sid,
       }));
       ref.card._cmtLoaded = true;
     } catch (e) {
@@ -818,21 +838,31 @@ export function setupTodoEvents() {
 
     detailActivity.innerHTML = (c.comments || [])
       .map((cm) => {
-        const canDel = (cm.sid && MY_SID && cm.sid === MY_SID) || false;
+        // ✅ admin thấy hết; user thường thấy nếu đúng sid
+        const canDel = IS_ADMIN || (cm.uid && CUR.uid && cm.uid === CUR.uid);
+        console.log("[MY_SID]", CUR.uid);
+        console.log("[cm.sid]", cm.uid);
+        console.log(
+          "[canDel]",
+          IS_ADMIN || (cm.uid && CUR.uid && cm.uid === CUR.uid)
+        );
+        // const canDel = true;
+
         const delBtn = canDel
-          ? `<button class="cmt-dot" data-cmt-del="${esc(
+          ? `<button class="cmt-del" data-cmt-del="${esc(
               cm.cid
-            )}" title="Delete"></button>`
+            )}" title="Delete" style="background-color: transparent; border:none; font-size:9px">✖</button>`
           : "";
+
         return `
-        <div class="item" data-cmt-id="${esc(cm.cid)}">
-          <div style="display:flex;align-items:center;gap:8px;">
-            <b>${esc(cm.author || "Guest")}</b>
-            <span style="opacity:.7">${new Date(cm.ts).toLocaleString()}</span>
-            <span style="margin-left:auto; position:relative;">${delBtn}</span>
-          </div>
-          <div style="white-space:pre-wrap">${esc(cm.text)}</div>
-        </div>`;
+      <div class="item" data-cmt-id="${esc(cm.cid)}">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <b>${esc(cm.author || "Guest")}</b>
+          <span style="opacity:.7">${new Date(cm.ts).toLocaleString()}</span>
+          <span style="margin-left:auto;">${delBtn}</span>
+        </div>
+        <div style="white-space:pre-wrap">${esc(cm.text)}</div>
+      </div>`;
       })
       .join("");
   }
@@ -894,7 +924,22 @@ export function setupTodoEvents() {
     if (!btn || !socket) return;
     const cid = btn.getAttribute("data-cmt-del");
     const cardId = detail.dataset.cardId;
-    socket.emit("comment:remove", { boardId: BOARD_ID, cardId, cid }, () => {});
+
+    socket.emit(
+      "comment:remove",
+      {
+        boardId: BOARD_ID,
+        cardId,
+        cid,
+        uid: CUR.uid || null,
+        isAdmin: !!CUR.isAdmin,
+      },
+      (ack) => {
+        if (!ack || ack.ok !== true) {
+          alert("Xoá bình luận lỗi: " + (ack?.message || "unknown"));
+        }
+      }
+    );
   });
 
   // Drag helpers
