@@ -1,6 +1,5 @@
 // ui.js
 export function renderHeader() {
-  // Lấy thông tin user từ localStorage/sessionStorage
   const user = JSON.parse(
     localStorage.getItem("user_info") ||
       sessionStorage.getItem("user_info") ||
@@ -16,7 +15,14 @@ export function renderHeader() {
       <div class="branddot">
         <img src="assets/pictures/icon_company.png" alt="avatar">
       </div>
+
       <div class="divider-vert"></div>
+
+      <!----- Global Search bar ------>
+      <div class="searchbar2">
+        <span class="i-search"></span>
+        <input type="search" id="topbar-search" placeholder="Search" />
+      </div>
     </div>
 
     <div class="right">
@@ -33,7 +39,99 @@ export function renderHeader() {
   </header>`;
 }
 
-// Toggle light/dark theme
+/*-------- Global Search Bar Events (delegated) ---------*/
+// Đặt trong ui.js (một lần là đủ, không cần gọi thủ công)
+(() => {
+  let composing = false; // IME đang nhập?
+  let lastSent = null; // Tránh phát trùng
+  let raf = 0;
+
+  const getInput = () => document.getElementById("topbar-search");
+  const read = () => getInput()?.value ?? "";
+
+  const dispatch = (q) => {
+    if (q === lastSent) return;
+    lastSent = q;
+    window.dispatchEvent(
+      new CustomEvent("search-query-changed", { detail: { query: q } })
+    );
+  };
+
+  const emit = () => {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => dispatch(read()));
+  };
+
+  // --- Delegation: lắng nghe trên document ---
+  document.addEventListener("compositionstart", (e) => {
+    if (e.target?.id === "topbar-search") composing = true;
+  });
+
+  document.addEventListener("compositionend", (e) => {
+    if (e.target?.id === "topbar-search") {
+      composing = false;
+      emit();
+    }
+  });
+
+  // Gõ tới đâu lọc tới đó (kể cả paste/cut/drop)
+  const liveEvents = ["input", "search", "paste", "cut", "drop", "keyup"];
+  liveEvents.forEach((type) => {
+    document.addEventListener(type, (e) => {
+      if (e.target?.id !== "topbar-search") return;
+      if (!composing) emit();
+    });
+  });
+
+  // Đảm bảo nhấn 1 phím cũng lọc tức thì, và chặn Enter gây điều hướng
+  document.addEventListener("keydown", (e) => {
+    if (e.target?.id !== "topbar-search") return;
+    if (e.key === "Enter") {
+      e.preventDefault(); // tránh submit / điều hướng
+      e.stopPropagation();
+    }
+    if (e.key === "Escape") {
+      const el = getInput();
+      if (el) el.value = "";
+      lastSent = null;
+      composing = false;
+      emit();
+      return;
+    }
+    if (!composing) emit();
+  });
+
+  // Khi ô search được focus lại, phát lại để đồng bộ trang mới bind listener
+  document.addEventListener("focusin", (e) => {
+    if (e.target?.id === "topbar-search") {
+      lastSent = null;
+      emit();
+    }
+  });
+
+  // Đồng bộ khi chuyển route SPA / tab trở lại / DOM sẵn sàng
+  window.addEventListener("hashchange", () => {
+    lastSent = null;
+    emit();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      lastSent = null;
+      emit();
+    }
+  });
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      lastSent = null;
+      emit();
+    });
+  } else {
+    lastSent = null;
+    emit();
+  }
+})();
+
+/*----------- Toggle light/dark theme ------------*/
 window.toggleTheme = () => {
   const body = document.body;
   const icon = document.getElementById("theme-icon");
@@ -43,7 +141,6 @@ window.toggleTheme = () => {
     icon.className = dark ? "i-moon" : "i-sun";
   }
 
-  // lưu trạng thái vào localStorage
   localStorage.setItem("theme", dark ? "dark" : "light");
 };
 
@@ -82,7 +179,6 @@ export function renderSidebar() {
         <a class="side-item side-sublink" href="#/crud/plan">
           <span class="label">Kế hoạch bảo dưỡng năm</span>
         </a>
-
       </div>
     </div>
 
@@ -107,19 +203,17 @@ window.toggleSidebar = () => {
   }
 })();
 
+// Xử lý popup user khi click avatar
 document.addEventListener("click", function (e) {
-  // Mở popup khi click avatar
   if (e.target.closest && e.target.closest(".avatar.user-menu")) {
     if (document.getElementById("user-profile-popup")) return;
     const popupHtml = renderUserProfilePopup();
     document.body.insertAdjacentHTML("beforeend", popupHtml);
 
-    // Đóng popup
     document.getElementById("close-profile-popup").onclick = closeProfilePopup;
     document.getElementById("profile-popup-overlay").onclick =
       closeProfilePopup;
 
-    // Đăng xuất
     document.getElementById("btn-logout-popup").onclick = function () {
       localStorage.removeItem("auth_token");
       localStorage.removeItem("refresh_token");

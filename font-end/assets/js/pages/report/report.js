@@ -4,7 +4,10 @@ import {
   renderMonthlyWorkReport,
   submitInspectionReport,
 } from "./monthlywork.js";
-import { renderInnovateReport } from "./innovateReport.js";
+import {
+  rendergeneratorReport,
+  submitGeneratorData,
+} from "./generatorReport.js";
 import {
   renderMaintenanceReport,
   submitMaintenanceReport,
@@ -21,7 +24,7 @@ export async function renderMaintenance() {
           <select id="report-type" style="padding:8px 10px;border:1px solid #ddd;border-radius:8px">
             <option value="filterAHU">Báo cáo thay thế OA filter</option>
             <option value="monthlywork">Báo cáo kiểm tra thiết bị định kỳ</option>
-            <option value="innovateReport">Báo cáo cải tiến</option>
+            <option value="generatorReport">Nhật ký vận hành máy phát</option>
             <option value="maintenanceReport">Lịch sử sửa chữa bảo dưỡng</option>
           </select>
         </label>
@@ -30,7 +33,7 @@ export async function renderMaintenance() {
           <input type="date" id="filter-date" style="padding:8px 10px; border:1px solid #ddd; border-radius:8px" />
         </label>
 
-        <button id="add-task-btn" class="btn primary" style="padding:8px 12px; background-color:#1976d2; color:white; border:none; border-radius:4px; cursor:pointer; display:none">
+        <button id="add-task-btn" class="btn primary" style="padding:8px 12px; background-color:#1976d2; color:white; border:none; border-radius:6px; cursor:pointer; display:none">
           ➕ Thêm nội dung
         </button>
 
@@ -90,8 +93,8 @@ export function setupReportEvents() {
         return "BÁO CÁO THAY THẾ OA FILTER AHU";
       case "monthlywork":
         return "BÁO CÁO KIỂM TRA THIẾT BỊ ĐỊNH KỲ";
-      case "innovateReport":
-        return "BÁO CÁO CẢI TIẾN";
+      case "generatorReport":
+        return "NHẬT KÝ VẬN HÀNH MÁY PHÁT";
       case "maintenanceReport":
         return "LỊCH SỬ SỬA CHỮA BẢO DƯỠNG";
       default:
@@ -321,13 +324,13 @@ export function setupReportEvents() {
   const map = {
     filterAHU: renderFilterReport,
     monthlywork: renderMonthlyWorkReport,
-    innovateReport: renderInnovateReport,
+    generatorReport: rendergeneratorReport,
     maintenanceReport: renderMaintenanceReport,
   };
   const titles = {
     filterAHU: "BÁO CÁO THAY THẾ OA FILTER",
     monthlywork: "BÁO CÁO KIỂM TRA THIẾT BỊ ĐỊNH KỲ",
-    innovateReport: "BÁO CÁO CẢI TIẾN",
+    generatorReport: "NHẬT KÝ VẬN HÀNH MÁY PHÁT",
     maintenanceReport: "LỊCH SỬ SỬA CHỮA BẢO DƯỠNG",
   };
   const formatDateToSlash = (s) => (s ? String(s).replace(/-/g, "/") : "");
@@ -359,6 +362,8 @@ export function setupReportEvents() {
           window.__setMaintenanceEditMode?.(false);
         } else if (type === "monthlywork") {
           window.__setInspectionEditMode?.(false);
+        } else if (type === "generatorReport") {
+          window.__setGeneratorEditMode?.(false);
         }
       } else {
         container.innerHTML = "<p style='padding:12px'>Không có dữ liệu</p>";
@@ -393,6 +398,9 @@ export function setupReportEvents() {
     } else if (select.value === "monthlywork") {
       document.getElementById("add-task-btn").style.display = "flex";
       window.__setInspectionEditMode?.(true);
+    } else if (select.value === "generatorReport") {
+      document.getElementById("add-task-btn").style.display = "flex";
+      window.__setGeneratorEditMode?.(true);
     } else {
       document.getElementById("add-task-btn").style.display = "none";
     }
@@ -411,11 +419,13 @@ export function setupReportEvents() {
         await submitMaintenanceReport(date);
       } else if (type === "monthlywork") {
         await submitInspectionReport(date);
+      } else if (type === "generatorReport") {
+        await submitGeneratorData(date);
       } else {
         alert("Chưa gắn submit cho loại báo cáo này.");
         return;
       }
-      alert("Cập nhật thành công!");
+      alert("Update Successfully!");
       document.getElementById("update-report").style.display = "none";
       document.getElementById("exit").style.display = "none";
       document.getElementById("edit-report").style.display = "inline-flex";
@@ -441,6 +451,9 @@ export function setupReportEvents() {
     }
     if (select.value === "monthlywork") {
       window.__setInspectionEditMode?.(false);
+    }
+    if (select.vale === "generatorReport") {
+      window.__setGeneratorEditMode?.(false);
     }
 
     await renderSelectedReport();

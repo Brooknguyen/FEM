@@ -7,15 +7,12 @@ import {
 } from "./config_plan.js";
 import { renderPlanTabs } from "./tabs_plan.js";
 
-let ORIGINAL_ROWS = [];
-let ORIGINAL_MERGES = [];
-let ORIGINAL_WRAP_CELLS = [];
-
 const STATE = {
   sheetName: "",
   rows: [],
   merges: [],
-  wrapCells: [], // ⬅️ danh sách ô có wrapText (từ Excel)
+  wrapCells: [], // từ BE: danh sách ô cần wrap (tùy cấu trúc, xem chú thích bên dưới)
+  lastQuery: "", // lấy từ topbar (ui.js)
 };
 
 function escapeHtml(s) {
@@ -31,7 +28,7 @@ function escapeHtml(s) {
  * @param {string[][]} matrix
  * @param {{s:{r:number,c:number},e:{r:number,c:number}}[]} merges
  * @param {number} headerRows
- * @param {Set<string>} wrapSet - tập key "r:c" cho các ô cần wrap
+ * @param {Set<string>} wrapSet - tập key "r:c" cho các ô cần wrap (tùy theo dữ liệu)
  */
 function renderMergedTable(matrix, merges, headerRows, wrapSet) {
   const R = matrix.length;
@@ -61,7 +58,6 @@ function renderMergedTable(matrix, merges, headerRows, wrapSet) {
       const attrs = [];
       if (span.rowspan > 1) attrs.push(`rowspan="${span.rowspan}"`);
       if (span.colspan > 1) attrs.push(`colspan="${span.colspan}"`);
-      // Header: luôn 1 dòng (nowrap)
       html += `<th ${attrs.join(" ")}>${escapeHtml(matrix[r][c] ?? "")}</th>`;
     }
     html += `</tr>`;
@@ -77,13 +73,12 @@ function renderMergedTable(matrix, merges, headerRows, wrapSet) {
       if (span.rowspan > 1) attrs.push(`rowspan="${span.rowspan}"`);
       if (span.colspan > 1) attrs.push(`colspan="${span.colspan}"`);
 
-      // Nếu ô này nằm trong wrapSet -> cho phép xuống dòng + bẻ từ
       const key = `${r}:${c}`;
-      const cellStyle = wrapSet?.has(key)
+      const wrapStyle = wrapSet?.has(key)
         ? 'style="white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;"'
-        : ""; // mặc định không wrap (1 dòng)
+        : ""; // nếu không trong wrapSet thì theo CSS mặc định
 
-      html += `<td ${attrs.join(" ")} ${cellStyle}>${escapeHtml(
+      html += `<td ${attrs.join(" ")} ${wrapStyle}>${escapeHtml(
         matrix[r][c] ?? ""
       )}</td>`;
     }
@@ -113,13 +108,8 @@ export function renderPlanPage(key) {
   <section class="card">
     <div class="card-h">
       <div class="title"><span class="title-lg">${cfg.title}</span></div>
-      <!-- Search bar -->
-      <div class="searchbar2">
-        <span class="i-search"></span>
-        <input type="search" id="${key}-search" placeholder="Search" />
-      </div>
+      <!-- ĐÃ GỠ searchbar cục bộ; dùng topbar trong ui.js -->
     </div>
-    
 
     <div class="p-4">
       ${renderPlanTabs(key)}
@@ -140,16 +130,15 @@ export function renderPlanPage(key) {
       background: var(--card);
       --hdr1: 42px; /* fallback nếu JS chưa đo được */
     }
+
     #${ids.prev} table {
       border-collapse: collapse;
       width: max-content;
       background: var(--card);
       color: var(--fg);
     }
-    /* Mặc định:
-       - Header (th) luôn 1 dòng (nowrap)
-       - Body (td) cũng một dòng, trừ những ô có wrapSet -> inline style sẽ bật pre-wrap
-       => Giữ đúng wrap-text theo Excel khi BE cung cấp wrapCells */
+
+    /* Bạn đang để pre-wrap cho cả th/td — giữ nguyên như hiện tại */
     #${ids.prev} th,
     #${ids.prev} td {
       border: 1px solid var(--line);
@@ -191,61 +180,98 @@ export function bindPlanEvents(key) {
 
   const tip = document.getElementById(`${key}-tip`);
   const preview = document.getElementById(`${key}-preview`);
-  const searchInput = document.getElementById(`${key}-search`);
   if (!preview) return;
 
-  let currentFilter = "";
+  // ---- Helper: tạo wrapSet từ STATE.wrapCells (nếu BE trả dạng {r,c} hoặc "r:c") ----
+  function toWrapSet(rowsCountOffset = 0) {
+    // Khi không lọc: dùng chỉ số gốc -> wrapSet theo indices gốc
+    // Khi lọc: bỏ merges, và chỉ số thay đổi -> để đơn giản, không áp wrapSet (trả về empty)
+    const set = new Set();
+    // Hỗ trợ 2 kiểu dữ liệu thường gặp từ BE:
+    // - mảng key "r:c"
+    // - mảng đối tượng { r, c }
+    for (const item of STATE.wrapCells || []) {
+      if (typeof item === "string" && item.includes(":")) {
+        set.add(item); // ví dụ "12:3"
+      } else if (
+        item &&
+        typeof item === "object" &&
+        "r" in item &&
+        "c" in item
+      ) {
+        set.add(`${item.r}:${item.c}`);
+      }
+    }
+    return set;
+  }
 
+  // ---- Render theo query hiện tại từ topbar ----
+  function renderWithFilter() {
+    const q = (STATE.lastQuery || "").trim().toLowerCase();
+
+    if (!STATE.rows.length) {
+      preview.innerHTML = "";
+      tip.textContent = "Empty.";
+      return;
+    }
+
+    const headers = STATE.rows.slice(0, FREEZE_HEADER_ROWS);
+    const dataRows = STATE.rows.slice(FREEZE_HEADER_ROWS);
+
+    const filteredBody = q
+      ? dataRows.filter((row) =>
+          row.some((cell) =>
+            String(cell ?? "")
+              .toLowerCase()
+              .includes(q)
+          )
+        )
+      : dataRows;
+
+    const rowsToRender = [...headers, ...filteredBody];
+
+    // Khi có filter -> bỏ merges để tránh lệch; wrapSet cũng bỏ vì index thay đổi
+    const mergesToUse = q ? [] : STATE.merges;
+    const wrapSet = q ? new Set() : toWrapSet();
+
+    preview.innerHTML = renderMergedTable(
+      rowsToRender,
+      mergesToUse,
+      FREEZE_HEADER_ROWS,
+      wrapSet
+    );
+    adjustFreezeOffsets(preview);
+
+    tip.textContent = `Sheet: ${STATE.sheetName} — ${
+      filteredBody.length
+    } hàng ${q ? "(đã lọc)" : ""} + ${FREEZE_HEADER_ROWS} hàng header`;
+  }
+
+  // ---- Nhận event từ topbar search (ui.js -> 'search-query-changed') ----
+  const onGlobalSearch = (e) => {
+    STATE.lastQuery = e.detail?.query || "";
+    renderWithFilter();
+  };
+  window.addEventListener("search-query-changed", onGlobalSearch);
+
+  // Nếu topbar đã có sẵn giá trị khi mở trang -> đồng bộ ngay
+  const topbarInput = document.getElementById("topbar-search");
+  if (topbarInput && topbarInput.value) {
+    STATE.lastQuery = topbarInput.value;
+  }
+
+  // ===== Auto load latest khi vào trang =====
   loadLatestAndRender(cfg.defaultSheet).catch((e) => {
     console.warn("Không load được sheet mặc định:", e);
     tip.textContent = "Empty";
   });
 
+  // Recalc sticky offsets khi resize
   window.addEventListener("resize", () => adjustFreezeOffsets(preview), {
     passive: true,
   });
 
-  function renderFilteredTable() {
-    const filter = currentFilter.trim().toLowerCase();
-    if (!filter) {
-      // Hiển thị bảng gốc không lọc
-      preview.innerHTML = renderMergedTable(
-        STATE.rows,
-        STATE.merges,
-        FREEZE_HEADER_ROWS
-      );
-      adjustFreezeOffsets(preview);
-      tip.textContent = `Sheet: ${STATE.sheetName} — ${
-        STATE.rows.length
-      } hàng × ${(STATE.rows[0] || []).length} cột. Merge: ${
-        STATE.merges.length
-      }`;
-      return;
-    }
-
-    // Lấy 2 dòng đầu tiên giữ nguyên (header)
-    const headerRows = STATE.rows.slice(0, FREEZE_HEADER_ROWS);
-
-    // Lọc dữ liệu từ dòng thứ 3 trở đi
-    const dataRows = STATE.rows.slice(FREEZE_HEADER_ROWS);
-    const filteredDataRows = dataRows.filter((row) =>
-      row.some((cell) => String(cell).toLowerCase().includes(filter))
-    );
-
-    // Kết hợp lại header + dữ liệu đã lọc
-    const combinedRows = [...headerRows, ...filteredDataRows];
-
-    // Cập nhật merges cũng nên xử lý để tránh lỗi (ở đây mình bỏ merges khi filter)
-    preview.innerHTML = renderMergedTable(combinedRows, [], FREEZE_HEADER_ROWS);
-    adjustFreezeOffsets(preview);
-    tip.textContent = `Sheet: ${STATE.sheetName} — ${filteredDataRows.length} hàng (đã lọc) + ${FREEZE_HEADER_ROWS} hàng header`;
-  }
-
-  searchInput?.addEventListener("input", (e) => {
-    currentFilter = e.target.value;
-    renderFilteredTable();
-  });
-
+  // ===== helpers =====
   async function loadLatestAndRender(sheetName) {
     const params = new URLSearchParams(location.search);
     const sheet = params.get("sheet") || sheetName;
@@ -264,6 +290,7 @@ export function bindPlanEvents(key) {
       if (tryAny.ok) res = tryAny;
       else {
         tip.textContent = "Empty.";
+        preview.innerHTML = "";
         return;
       }
     }
@@ -281,10 +308,14 @@ export function bindPlanEvents(key) {
 
     if (!STATE.rows.length) {
       tip.textContent = `Sheet "${STATE.sheetName}" hiện rỗng.`;
+      preview.innerHTML = "";
       return;
     }
 
-    // Hiển thị dữ liệu gốc lúc đầu
-    renderFilteredTable();
+    // Render lần đầu theo query đang có (live)
+    renderWithFilter();
   }
+
+  // (Tuỳ chọn) cleanup khi rời trang:
+  // return () => window.removeEventListener("search-query-changed", onGlobalSearch);
 }

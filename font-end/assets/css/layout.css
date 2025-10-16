@@ -264,6 +264,7 @@ body.dark-theme .side-item.active{ background:color-mix(in oklab, var(--primary)
 }
 
 /* collapse */
+
 body.is-collapsed .sidebar2{ width:var(--sb-w-collapsed); }
 body.is-collapsed #main{ margin-left:var(--sb-w-collapsed); }
 body.is-collapsed .side-item .label{ display:none; }

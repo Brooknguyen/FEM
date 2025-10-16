@@ -110,7 +110,6 @@ export function renderTodoPage() {
           isAdmin
             ? `
           <button id="kb-clear-done" class="btn gray" style="background-color: green">🧹 Update</button>
-          <button id="kb-clear-all" class="btn gray" style="background-color: #d91c42ff">🗑️ Delete Card</button>
         `
             : ``
         }
@@ -840,12 +839,6 @@ export function setupTodoEvents() {
       .map((cm) => {
         // ✅ admin thấy hết; user thường thấy nếu đúng sid
         const canDel = IS_ADMIN || (cm.uid && CUR.uid && cm.uid === CUR.uid);
-        console.log("[MY_SID]", CUR.uid);
-        console.log("[cm.sid]", cm.uid);
-        console.log(
-          "[canDel]",
-          IS_ADMIN || (cm.uid && CUR.uid && cm.uid === CUR.uid)
-        );
         // const canDel = true;
 
         const delBtn = canDel

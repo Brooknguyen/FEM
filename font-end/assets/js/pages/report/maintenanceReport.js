@@ -3,7 +3,6 @@ const API_BASE = "http://10.100.201.25:4000/api/mainreport";
 
 export async function renderMaintenanceReport(date) {
   const html = `
-    <div style="margin-bottom:16px;"></div>
 
     <table class="table-report">
       <thead>
@@ -26,7 +25,7 @@ export async function renderMaintenanceReport(date) {
     <!-- Modal -->
     <div id="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
       <div style="background:white; padding:20px; border-radius:8px; width:500px; max-width:90%;">
-        <h3 style="color:black; text-align:center;">Thêm công việc mới</h3>
+        <h3 style="color:black; text-align:center;">Thêm nội dung</h3>
         <label style="color:black">Nội dung công việc: <input type="text" id="task-content" style="width:100%" placeholder="Sửa máy nén khí 9"/></label><br/><br/>
         <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 16px;">
           <label style="color:black">Ngày thực hiện: 
@@ -222,8 +221,8 @@ function setupMaintenanceEvents(date) {
     const td = document.createElement("td");
     td.className = "actions-col";
     td.innerHTML = `
-      <button class="edit-btn" style="margin-right: 8px; background-color:transparent; color:var(--fg);">Sửa</button>
-      <button class="delete-btn" style="background-color: #f44336; color: var(--fg);">Xóa</button>
+      <button  class="btn primary edit-btn" style="margin-right:8px; background:#43ff64d9; color:black; border-radius: 5px; border:none; height: 30px; width:50px">Edit</button>
+      <button class="btn primary delete-btn" style="margin-right:8px; background:red; color:black; border-radius: 5px; border:none; height: 30px; width:60px;">Delete</button>
     `;
     row.appendChild(td);
     attachRowActions(row);

@@ -76,6 +76,7 @@ function setupInspectionEvents(date) {
         tbody.appendChild(row);
         currentIndex = idx + 2;
       });
+      updateNoDataRow();
     })
     .catch((err) => {
       console.error(err);
@@ -134,8 +135,8 @@ function setupInspectionEvents(date) {
     const td = document.createElement("td");
     td.className = "actions-col";
     td.innerHTML = `
-      <button class="edit-btn" style="margin-right:6px; background:transparent;">Sửa</button>
-      <button class="delete-btn" style="background:#ef4444;color:#fff;border:none;padding:4px 8px;border-radius:3px;">Xóa</button>
+      <button  class="btn primary edit-btn" style="margin-right:8px; background:#43ff64d9; color:black; border-radius: 5px; border:none; height: 30px; width:50px">Edit</button>
+      <button class="btn primary delete-btn" style="margin-right:8px; background:red; color:black; border-radius: 5px; border:none; height: 30px; width:60px;">Delete</button>
     `;
     row.appendChild(td);
 
@@ -148,6 +149,7 @@ function setupInspectionEvents(date) {
       if (confirm("Xóa dòng này?")) {
         row.remove();
         renumber();
+        updateNoDataRow();
         if (editingRow === row) editingRow = null;
       }
     });
@@ -165,6 +167,23 @@ function setupInspectionEvents(date) {
       tr.appendChild(th);
     } else if (!show && has) {
       has.remove();
+    }
+  }
+
+  // ====== update table when have no data ======
+  function updateNoDataRow() {
+    const rows = tbody.querySelectorAll("tr");
+    const noDataRow = tbody.querySelector(".no-data-row");
+    if (rows.length === 0) {
+      if (!noDataRow) {
+        const tr = document.createElement("tr");
+        tr.className = "no-data-row";
+        const colspan = isEditMode() ? 6 : 5;
+        tr.innerHTML = `<td colspan="${colspan}" style="text-align:center; color:#999;">Không có dữ liệu</td>`;
+        tbody.appendChild(tr);
+      }
+    } else {
+      if (noDataRow) noDataRow.remove();
     }
   }
 
@@ -218,6 +237,7 @@ function setupInspectionEvents(date) {
       const row = makeRow(data, currentIndex++);
       tbody.appendChild(row);
     }
+    updateNoDataRow();
     closeModal();
   });
 }

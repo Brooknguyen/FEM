@@ -11,6 +11,7 @@ const STATE = {
   sheetName: "",
   rows: [],
   merges: [],
+  lastQuery: "", // lấy từ topbar (ui.js)
 };
 
 function escapeHtml(str) {
@@ -22,7 +23,9 @@ function escapeHtml(str) {
 }
 
 function generateMergedCellsMap(merges, rowCount, colCount) {
-  const hidden = Array.from({ length: rowCount }, () => Array(colCount).fill(false));
+  const hidden = Array.from({ length: rowCount }, () =>
+    Array(colCount).fill(false)
+  );
   const spanMap = new Map();
 
   merges.forEach(({ s, e }) => {
@@ -43,7 +46,11 @@ function generateMergedCellsMap(merges, rowCount, colCount) {
 function renderMergedTable(matrix, merges, headerRows) {
   const rowCount = matrix.length;
   const colCount = (matrix[0] || []).length;
-  const { hidden, spanMap } = generateMergedCellsMap(merges, rowCount, colCount);
+  const { hidden, spanMap } = generateMergedCellsMap(
+    merges,
+    rowCount,
+    colCount
+  );
 
   const renderRow = (rowIdx, tag) =>
     `<tr>` +
@@ -54,14 +61,22 @@ function renderMergedTable(matrix, merges, headerRows) {
         const attrs = [
           span.rowspan > 1 ? `rowspan="${span.rowspan}"` : "",
           span.colspan > 1 ? `colspan="${span.colspan}"` : "",
-        ].filter(Boolean).join(" ");
+        ]
+          .filter(Boolean)
+          .join(" ");
         return `<${tag} ${attrs}>${escapeHtml(cell ?? "")}</${tag}>`;
       })
       .join("") +
     `</tr>`;
 
-  const thead = matrix.slice(0, headerRows).map((_, r) => renderRow(r, "th")).join("");
-  const tbody = matrix.slice(headerRows).map((_, r) => renderRow(r + headerRows, "td")).join("");
+  const thead = matrix
+    .slice(0, FREEZE_HEADER_ROWS)
+    .map((_, r) => renderRow(r, "th"))
+    .join("");
+  const tbody = matrix
+    .slice(FREEZE_HEADER_ROWS)
+    .map((_, r) => renderRow(r + FREEZE_HEADER_ROWS, "td"))
+    .join("");
 
   return `<table><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
 }
@@ -84,10 +99,7 @@ export function renderInfoPage(key) {
     <section class="card">
       <div class="card-h">
         <div class="title"><span class="title-lg">${cfg.title}</span></div>
-        <div class="searchbar2">
-          <span class="i-search"></span>
-          <input type="search" id="${key}-search" placeholder="Search" />
-        </div>
+        <!-- ĐÃ GỠ searchbar cục bộ; dùng topbar trong ui.js -->
       </div>
 
       <div class="p-4">
@@ -171,11 +183,66 @@ export function bindInfoEvents(key) {
 
   const tipEl = document.getElementById(`${key}-tip`);
   const previewEl = document.getElementById(`${key}-preview`);
-  const searchInput = document.getElementById(`${key}-search`);
   if (!previewEl) return;
 
-  let currentFilter = "";
+  // === Lọc dựa trên search bar global từ ui.js ===
+  const renderFilteredTable = () => {
+    const q = (STATE.lastQuery || "").trim().toLowerCase();
 
+    const headers = STATE.rows.slice(0, FREEZE_HEADER_ROWS);
+    const dataRows = STATE.rows.slice(FREEZE_HEADER_ROWS);
+
+    // Khi có query: giữ header, lọc body; bỏ merges (tương tự search cục bộ trước đây)
+    const filteredBody = !q
+      ? dataRows
+      : dataRows.filter((row) =>
+          row.some((cell) =>
+            String(cell ?? "")
+              .toLowerCase()
+              .includes(q)
+          )
+        );
+
+    const rowsToRender = [...headers, ...filteredBody];
+    const mergesToUse = q ? [] : STATE.merges;
+
+    previewEl.innerHTML = renderMergedTable(
+      rowsToRender,
+      mergesToUse,
+      FREEZE_HEADER_ROWS
+    );
+    adjustFreezeOffsets(previewEl);
+
+    tipEl.textContent = `Sheet: ${STATE.sheetName} — ${
+      filteredBody.length
+    } hàng ${q ? "(đã lọc)" : ""} + ${FREEZE_HEADER_ROWS} hàng header`;
+  };
+
+  // Nhận event từ topbar search (ui.js -> 'search-query-changed')
+  const onGlobalSearch = (e) => {
+    STATE.lastQuery = e.detail?.query || "";
+    renderFilteredTable();
+  };
+  window.addEventListener("search-query-changed", onGlobalSearch);
+
+  // Nếu người dùng đã gõ sẵn trên topbar, đồng bộ ngay khi vào trang
+  const topbarInput = document.getElementById("topbar-search");
+  if (topbarInput && topbarInput.value) {
+    STATE.lastQuery = topbarInput.value;
+  }
+
+  // Load dữ liệu và render lần đầu (theo query đang có)
+  loadLatestAndRender(cfg.defaultSheet).catch((err) => {
+    console.warn("Không load được sheet mặc định:", err);
+    tipEl.textContent = "Empty";
+  });
+
+  // Recalc sticky offsets khi resize
+  window.addEventListener("resize", () => adjustFreezeOffsets(previewEl), {
+    passive: true,
+  });
+
+  // --- helpers ---
   async function loadLatestAndRender(defaultSheetName) {
     const params = new URLSearchParams(location.search);
     const sheetName = params.get("sheet") || defaultSheetName;
@@ -196,6 +263,7 @@ export function bindInfoEvents(key) {
         response = fallback;
       } else {
         tipEl.textContent = "Empty.";
+        previewEl.innerHTML = "";
         return;
       }
     }
@@ -212,47 +280,13 @@ export function bindInfoEvents(key) {
 
     if (!STATE.rows.length) {
       tipEl.textContent = `Sheet "${STATE.sheetName}" hiện rỗng.`;
+      previewEl.innerHTML = "";
       return;
     }
 
     renderFilteredTable();
   }
 
-  function renderFilteredTable() {
-    const filterText = currentFilter.trim().toLowerCase();
-
-    const headers = STATE.rows.slice(0, FREEZE_HEADER_ROWS);
-    const dataRows = STATE.rows.slice(FREEZE_HEADER_ROWS);
-
-    const filteredRows = !filterText
-      ? dataRows
-      : dataRows.filter((row) =>
-          row.some((cell) => String(cell).toLowerCase().includes(filterText))
-        );
-
-    const combinedRows = [...headers, ...filteredRows];
-    const merges = filterText ? [] : STATE.merges;
-
-    previewEl.innerHTML = renderMergedTable(combinedRows, merges, FREEZE_HEADER_ROWS);
-    adjustFreezeOffsets(previewEl);
-
-    tipEl.textContent = `Sheet: ${STATE.sheetName} — ${
-      filteredRows.length
-    } hàng ${filterText ? "(đã lọc)" : ""} + ${FREEZE_HEADER_ROWS} hàng header`;
-  }
-
-  // Bind events
-  searchInput?.addEventListener("input", (e) => {
-    currentFilter = e.target.value;
-    renderFilteredTable();
-  });
-
-  window.addEventListener("resize", () => adjustFreezeOffsets(previewEl), {
-    passive: true,
-  });
-
-  loadLatestAndRender(cfg.defaultSheet).catch((err) => {
-    console.warn("Không load được sheet mặc định:", err);
-    tipEl.textContent = "Empty";
-  });
+  // (tuỳ chọn) cleanup khi rời trang:
+  // return () => window.removeEventListener("search-query-changed", onGlobalSearch);
 }

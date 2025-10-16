@@ -12,6 +12,7 @@ const STATE = {
   sheetName: "",
   rows: [],
   merges: [],
+  lastQuery: "", // lấy từ topbar (ui.js)
 };
 
 // ===== Helpers Excel/HTML =====
@@ -127,11 +128,7 @@ export function renderCrudPlanPage(key) {
   <section class="card">
     <div class="card-h">
       <div class="title"><span class="title-lg">${cfg.title}</span></div>
-      <!-- Search bar -->
-      <div class="searchbar2">
-        <span class="i-search"></span>
-        <input type="search" id="${key}-search" placeholder="Search" />
-      </div>
+      <!-- ĐÃ GỠ searchbar cục bộ; dùng topbar trong ui.js -->
     </div>
 
     <div class="p-4">
@@ -204,32 +201,59 @@ export function bindCrudPlanEvents(key) {
   const btnSave = document.getElementById(`${key}-save`);
   const tip = document.getElementById(`${key}-tip`);
   const preview = document.getElementById(`${key}-preview`);
-  const searchInput = document.getElementById(`${key}-search`); // lấy input search
   if (!fileInput) return;
 
-  let filteredRows = STATE.rows; // lưu mảng rows đã filter
+  // ---- Helper: render theo query hiện tại từ topbar ----
+  function renderWithFilter() {
+    if (!STATE.rows.length) {
+      preview.innerHTML = "";
+      btnExport.disabled = true;
+      btnSave.disabled = true;
+      return;
+    }
 
-  // Hàm render bảng theo dữ liệu truyền vào (có thể là filtered)
-  function renderTable(rows) {
+    const q = (STATE.lastQuery || "").trim().toLowerCase();
+    const headers = STATE.rows.slice(0, FREEZE_HEADER_ROWS);
+    const dataRows = STATE.rows.slice(FREEZE_HEADER_ROWS);
+
+    const filteredBody = q
+      ? dataRows.filter((row) =>
+          row.some((cell) =>
+            String(cell ?? "")
+              .toLowerCase()
+              .includes(q)
+          )
+        )
+      : dataRows;
+
+    const rowsToRender = [...headers, ...filteredBody];
+    const mergesToUse = q ? [] : STATE.merges; // có filter -> bỏ merge để không lệch
+
     preview.innerHTML = renderMergedTable(
-      rows,
-      STATE.merges,
+      rowsToRender,
+      mergesToUse,
       FREEZE_HEADER_ROWS
     );
     adjustFreezeOffsets(preview);
-    tip.textContent = `Sheet: ${STATE.sheetName} — ${rows.length} hàng × ${
-      (rows[0] || []).length
-    } cột. Merge: ${STATE.merges.length}`;
+
+    tip.textContent = `Sheet: ${STATE.sheetName} — ${
+      filteredBody.length
+    } hàng ${q ? "(đã lọc)" : ""} + ${FREEZE_HEADER_ROWS} hàng header`;
+    btnExport.disabled = false;
+    btnSave.disabled = false;
   }
 
-  // Hàm lọc dữ liệu theo từ khóa search
-  function filterRows(keyword) {
-    if (!keyword) return STATE.rows;
-    const kw = keyword.toLowerCase();
-    // Lọc những hàng mà có ít nhất một ô chứa từ khóa
-    return STATE.rows.filter((row) =>
-      row.some((cell) => String(cell).toLowerCase().includes(kw))
-    );
+  // ---- Nhận event từ topbar search (ui.js -> 'search-query-changed') ----
+  const onGlobalSearch = (e) => {
+    STATE.lastQuery = e.detail?.query || "";
+    renderWithFilter();
+  };
+  window.addEventListener("search-query-changed", onGlobalSearch);
+
+  // Nếu topbar đã có sẵn giá trị khi mở trang -> đồng bộ ngay
+  const topbarInput = document.getElementById("topbar-search");
+  if (topbarInput && topbarInput.value) {
+    STATE.lastQuery = topbarInput.value;
   }
 
   // ===== Auto load latest khi vào trang =====
@@ -240,47 +264,6 @@ export function bindCrudPlanEvents(key) {
     btnExport.disabled = true;
     btnSave.disabled = true;
   });
-
-  // ===== Search event =====
-  if (searchInput) {
-    searchInput.addEventListener("input", () => {
-      const query = searchInput.value.trim().toLowerCase();
-
-      if (!query) {
-        // Hiển thị lại toàn bộ bảng nếu search rỗng
-        preview.innerHTML = renderMergedTable(
-          STATE.rows,
-          STATE.merges,
-          FREEZE_HEADER_ROWS
-        );
-        adjustFreezeOffsets(preview);
-        return;
-      }
-
-      // Lấy 2 hàng đầu giữ nguyên
-      const headerRows = STATE.rows.slice(0, FREEZE_HEADER_ROWS);
-
-      // Lọc các hàng phía dưới header có chứa query
-      const filteredBodyRows = STATE.rows
-        .slice(FREEZE_HEADER_ROWS)
-        .filter((row) =>
-          row.some((cell) =>
-            (cell ?? "").toString().toLowerCase().includes(query)
-          )
-        );
-
-      // Ghép header + filtered body
-      const filteredRows = headerRows.concat(filteredBodyRows);
-
-      // Bỏ merge khi filter vì không khớp được
-      preview.innerHTML = renderMergedTable(
-        filteredRows,
-        [],
-        FREEZE_HEADER_ROWS
-      );
-      adjustFreezeOffsets(preview);
-    });
-  }
 
   // ===== Import Excel =====
   btnImport.onclick = () => fileInput.click();
@@ -298,12 +281,10 @@ export function bindCrudPlanEvents(key) {
       STATE.rows = matrix;
       STATE.merges = merges;
 
-      filteredRows = STATE.rows; // reset filter khi import file mới
-      if (searchInput) searchInput.value = "";
-
-      renderTable(filteredRows);
-      btnExport.disabled = false;
-      btnSave.disabled = false;
+      tip.textContent = `Sheet: ${wsName} — ${matrix.length} hàng × ${
+        (matrix[0] || []).length
+      } cột. Merge: ${merges.length}`;
+      renderWithFilter(); // render theo query hiện tại
     } catch (e) {
       console.error(e);
       alert("Không đọc được file Excel");
@@ -375,6 +356,7 @@ export function bindCrudPlanEvents(key) {
           "Chưa có dữ liệu trong Mongo. Hãy Import rồi bấm Save để tạo bản đầu tiên.";
         btnExport.disabled = true;
         btnSave.disabled = true;
+        preview.innerHTML = "";
         return;
       }
     }
@@ -391,16 +373,16 @@ export function bindCrudPlanEvents(key) {
 
     if (!STATE.rows.length) {
       tip.textContent = `Sheet "${STATE.sheetName}" hiện rỗng.`;
+      preview.innerHTML = "";
       btnExport.disabled = true;
       btnSave.disabled = true;
       return;
     }
 
-    filteredRows = STATE.rows; // reset filter khi load dữ liệu mới
-    if (searchInput) searchInput.value = "";
-
-    renderTable(filteredRows);
-    btnExport.disabled = false;
-    btnSave.disabled = false;
+    // Render theo query đang có (live)
+    renderWithFilter();
   }
+
+  // (Tuỳ chọn) cleanup khi rời trang:
+  // return () => window.removeEventListener("search-query-changed", onGlobalSearch);
 }

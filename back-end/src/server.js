@@ -20,6 +20,7 @@ import { auth } from "./middleware/auth.js";
 import recordsRouter from "./routes/records.js";
 import mainreportRouter from "./routes/mainreport.js";
 import inspectionReportRouter from "./routes/inspectionreport.js";
+import generatorRouter from "./routes/generatorRe.js"
 
 // Kanban (REST) + Socket handlers
 import kanbanRouter from "./routes/kanban.js";
@@ -84,6 +85,9 @@ app.use("/api/device-inspection", inspectionReportRouter);
 // Kanban (board + comments REST)
 app.use("/api/kanban", kanbanRouter);
 // Kanban (history REST)
+
+//History of operate generator
+app.use("/api/generator", generatorRouter);
 
 
 /** -------- Static uploads -------- */
