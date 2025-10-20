@@ -14,32 +14,50 @@ import { initCommentSockets } from "./sockets/comment.js";
 import { connectDB } from "./db.js";
 
 import authRouter from "./routes/auth.js";
-import deviceRouter from "./routes/device.js";
+import infoRouter from "./routes/info.js";
 import maintanceRouter from "./routes/maintenance.js";
 import { auth } from "./middleware/auth.js";
 import recordsRouter from "./routes/records.js";
 import mainreportRouter from "./routes/mainreport.js";
 import inspectionReportRouter from "./routes/inspectionreport.js";
-import generatorRouter from "./routes/generatorRe.js"
+import generatorRouter from "./routes/generatorRe.js";
 
 // Kanban (REST) + Socket handlers
 import kanbanRouter from "./routes/kanban.js";
+// import InfoSheet from "./models/InfoSheet.js"; // không cần ở server.js
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 
+/** -------- BASE_URL & UPLOAD_DIR (Cách B) -------- */
+// Dùng IP/port BE của bạn làm mặc định nếu .env không có
+const BASE_URL = (process.env.BASE_URL || "http://10.100.201.25:4000").replace(
+  /\/+$/,
+  ""
+);
+// Nhét lại vào env để utils/routes có thể lấy được
+process.env.BASE_URL = BASE_URL;
+
+// Dùng đường dẫn tuyệt đối cho uploads
+const UPLOAD_DIR = path.resolve(
+  process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads")
+);
+
 /** -------- Security / basics -------- */
 app.use(
   helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginResourcePolicy: { policy: "cross-origin" }, // cho phép tải ảnh từ domain khác
     crossOriginEmbedderPolicy: false,
   })
 );
-app.use(express.json());
 
-// CORS (một lần duy nhất)
+// tăng limit vì bạn post AOA + dataURL ảnh
+app.use(express.json({ limit: "200mb" }));
+app.use(express.urlencoded({ extended: true, limit: "200mb" }));
+
+// CORS
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "*";
 app.use(
   cors({
@@ -50,7 +68,7 @@ app.use(
 
 app.set("trust proxy", 1);
 
-// Rate limit (một lần duy nhất)
+// Rate limit
 app.use(
   rateLimit({
     windowMs: 15 * 60 * 1000,
@@ -61,7 +79,13 @@ app.use(
 );
 
 /** -------- Health check + sample -------- */
-app.get("/health", (_, res) => res.json({ ok: true }));
+app.get("/health", (_, res) =>
+  res.json({
+    ok: true,
+    BASE_URL,
+    UPLOAD_DIR,
+  })
+);
 app.get("/api/profile", auth(), (req, res) =>
   res.json({ message: "OK", user: req.user })
 );
@@ -70,32 +94,20 @@ app.get("/api/admin/secret", auth("admin"), (req, res) =>
 );
 
 /** -------- Routers -------- */
-// Login
 app.use("/api/auth", authRouter);
-// Thông tin máy
-app.use("/api/device", deviceRouter);
-// Kế hoạch bảo dưỡng theo năm
+app.use("/api/info", infoRouter);
 app.use("/api/maintenance", maintanceRouter);
-// Thay filter OA AHU hằng ngày
 app.use("/api/records", recordsRouter);
-// Lịch sử bảo dưỡng máy
 app.use("/api/mainreport", mainreportRouter);
-// Kiểm tra bảo dưỡng máy hàng tháng
 app.use("/api/device-inspection", inspectionReportRouter);
-// Kanban (board + comments REST)
 app.use("/api/kanban", kanbanRouter);
-// Kanban (history REST)
-
-//History of operate generator
 app.use("/api/generator", generatorRouter);
 
-
 /** -------- Static uploads -------- */
-const UPLOAD_DIR =
-  process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads");
 app.use(
   "/uploads",
   (req, res, next) => {
+    // cho phép mọi origin load ảnh
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
     res.setHeader("Access-Control-Allow-Origin", "*");
     next();
@@ -111,7 +123,6 @@ const MONGODB_URI = process.env.MONGODB_URI;
   try {
     await connectDB(MONGODB_URI);
 
-    // Tạo HTTP server rồi attach Socket.IO
     const httpServer = createServer(app);
 
     const io = new IOServer(httpServer, {
@@ -121,12 +132,14 @@ const MONGODB_URI = process.env.MONGODB_URI;
       },
     });
 
-    // Khởi tạo namespace/handlers cho comment realtime
     initCommentSockets(io);
 
     httpServer.listen(PORT, "0.0.0.0", () => {
       console.log(`[API] Listening on 0.0.0.0:${PORT}`);
-      console.log(`[API] Static uploads at /uploads -> ${UPLOAD_DIR}`);
+      console.log(`[API] BASE_URL = ${BASE_URL}`);
+      console.log(
+        `[API] Static uploads at ${BASE_URL}/uploads -> ${UPLOAD_DIR}`
+      );
       console.log(`[Socket] Ready`);
     });
   } catch (err) {

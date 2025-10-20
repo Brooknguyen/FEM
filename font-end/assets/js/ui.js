@@ -27,7 +27,7 @@ export function renderHeader() {
 
     <div class="right">
       <button class="iconbtn" title="Thông báo"><span class="i-bell"></span></button>
-      <button class="iconbtn" title="Tin nhắn"><span class="i-chat"></span></button>
+      <button id="chat-btn" class="iconbtn" title="Tin nhắn"><span class="i-chat"></span></button>
       <button class="iconbtn" title="Chế độ sáng/tối" onclick="window.toggleTheme()">
         <span id="theme-icon" class="i-sun"></span>
       </button>
@@ -269,3 +269,171 @@ export function renderUserProfilePopup() {
     <div class="profile-popup-overlay" id="profile-popup-overlay"></div>
   `;
 }
+
+/* ====================== CHAT POPUP ====================== */
+function renderChatPopup() {
+  if (document.getElementById("chat-popup")) return;
+
+  const html = `
+  <div id="chat-popup" style="
+    position: fixed; right:20px; bottom: 24px; z-index: 1000;
+    width: 360px; max-height: 70vh; display: none;
+    border-radius: 12px; overflow: hidden;
+    box-shadow: 0 12px 30px rgba(0,0,0,.18);
+    background: var(--card,#fff); color: var(--fg,#111);
+    border: 1px solid var(--line,#e5e7eb);
+  ">
+    <div style="display: flex; align-items:center; gap:8px; padding:10px 12px; border-bottom:1px solid var(--line,#e5e7eb); background: var(--card,#fff);">
+      <div style="font-weight:700;">Trợ lý (Assistant)</div>
+      <div style="flex:1"></div>
+      <button id="close-chat" class="iconbtn" title="Đóng" style="border:none; background: transparent; font-size:18px; cursor:pointer; line-height:1">×</button>
+    </div>
+
+    <div id="messages" style="
+      padding: 12px; overflow:auto; max-height: 46vh;
+      background: var(--card,#fff);
+    "></div>
+
+    <div style="display:flex; gap:8px; padding:10px; border-top:1px solid var(--line,#e5e7eb); background: var(--card,#fff);">
+      <input id="user-input" type="text" placeholder="Nhập câu hỏi…" style="
+        flex:1; border:1px solid var(--line,#e5e7eb); border-radius:8px;
+        padding:10px 12px; background:var(--card,#fff); color:var(--fg,#111);
+      ">
+      <button id="send-btn" class="btn primary" style="white-space: nowrap;">Gửi</button>
+    </div>
+  </div>
+  `;
+
+  // ĐÚNG: chèn HTML
+  document.body.insertAdjacentHTML("beforeend", html);
+}
+
+function getChatEls() {
+  return {
+    popup: document.getElementById("chat-popup"),
+    messages: document.getElementById("messages"),
+    input: document.getElementById("user-input"),
+    send: document.getElementById("send-btn"),
+    close: document.getElementById("close-chat"),
+  };
+}
+
+function openChat() {
+  renderChatPopup();
+  const { popup, input } = getChatEls();
+  if (!popup) return;
+  popup.style.display = "block";
+  setTimeout(() => input && input.focus(), 150);
+}
+
+function closeChat() {
+  const { popup } = getChatEls();
+  if (popup) popup.style.display = "none";
+}
+
+function addMessage(text, isUser) {
+  const { messages } = getChatEls();
+  if (!messages) return;
+
+  const msgDiv = document.createElement("div");
+  msgDiv.style.marginBottom = "8px";
+  msgDiv.style.maxWidth = "75%";
+  msgDiv.style.padding = "8px 13px";
+  msgDiv.style.borderRadius = "18px";
+  msgDiv.style.wordWrap = "break-word";
+  msgDiv.style.clear = "both";
+
+  if (isUser) {
+    msgDiv.style.background = "#0084ff";
+    msgDiv.style.color = "#fff";
+    msgDiv.style.float = "right";
+    msgDiv.style.borderBottomRightRadius = "0";
+  } else {
+    msgDiv.style.background = "#e5e5ea";
+    msgDiv.style.color = "#222";
+    msgDiv.style.float = "left";
+    msgDiv.style.borderBottomLeftRadius = "0";
+  }
+
+  msgDiv.textContent = text;
+  messages.appendChild(msgDiv);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+async function sendMessage() {
+  const { input, send, messages } = getChatEls();
+  if (!input || !send || !messages) return;
+
+  const text = input.value.trim();
+  if (!text) return;
+
+  addMessage(text, true);
+  input.value = "";
+  input.disabled = true;
+  send.disabled = true;
+
+  const loadingMsg = document.createElement("div");
+  Object.assign(loadingMsg.style, {
+    marginBottom: "8px",
+    maxWidth: "75%",
+    padding: "8px 13px",
+    borderRadius: "18px",
+    wordWrap: "break-word",
+    clear: "both",
+    background: "#e5e5ea",
+    color: "#222",
+    float: "left",
+    borderBottomLeftRadius: "0",
+  });
+  loadingMsg.innerHTML = `<div class="loading-dots"><span>.</span><span>.</span><span>.</span></div>`;
+  messages.appendChild(loadingMsg);
+  messages.scrollTop = messages.scrollHeight;
+
+  try {
+    const res = await fetch("http://127.0.0.1:1080/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+
+    if (!res.ok) throw new Error("Không nhận được phản hồi từ máy chủ AI");
+    const data = await res.json();
+
+    loadingMsg.textContent = data.answer || "Chịu, không biết!!!!";
+  } catch (error) {
+    loadingMsg.textContent = `👋 Chào bạn! Trợ lý AI đây — mình có thể bắt đầu từ đâu?`;
+  } finally {
+    input.disabled = false;
+    send.disabled = false;
+    input.focus();
+  }
+}
+
+/* ——— Event delegation: không phụ thuộc phần tử đã render hay chưa ——— */
+document.addEventListener("click", (e) => {
+  if (e.target.closest && e.target.closest("#chat-btn")) {
+    e.preventDefault();
+    openChat();
+    return;
+  }
+  if (e.target.closest && e.target.closest("#close-chat")) {
+    e.preventDefault();
+    closeChat();
+    return;
+  }
+  if (e.target.closest && e.target.closest("#send-btn")) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// Gửi bằng Enter
+document.addEventListener("keydown", (e) => {
+  const { input } = getChatEls();
+  if (!input) return;
+  if (document.activeElement === input && e.key === "Enter") {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+/* ====================== END CHAT POPUP ====================== */

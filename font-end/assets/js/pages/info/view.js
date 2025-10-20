@@ -1,292 +1,365 @@
 // assets/js/pages/info/view.js
-import {
-  INFO_RESOURCES,
-  INFO_KEYS,
-  FREEZE_FIRST_COL,
-  FREEZE_HEADER_ROWS,
-} from "./config.js";
-import { renderInfoTabs } from "./tabs.js";
+// ======= CONFIG =======
+const FREEZE_HEADER_ROWS =
+  typeof window.FREEZE_HEADER_ROWS === "number" ? window.FREEZE_HEADER_ROWS : 1;
 
+// ======= CỘT CHUẨN (fallback nếu sheet trống) =======
+const DEVICE_COLUMNS = [
+  "Hình ảnh",
+  "Tên thiết bị",
+  "Phân loại thiết bị",
+  "Model",
+  "Công suất",
+  "Điện áp",
+  "Capa",
+  "Gas",
+  "Hãng",
+  "Năm chế tạo",
+  "Vị trí hiện tại",
+  "Ghi chú",
+];
+
+/* ======= API/FILE BASE (IP cố định BE) ======= */
+const API_BASE = "http://10.100.201.25:4000";
+const FILE_BASE = "http://10.100.201.25:4000"; // prefix để hiển thị ảnh
+
+function toAbsUrl(u) {
+  const s = String(u || "").trim();
+  if (!s) return "";
+  if (/^data:/i.test(s)) return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/")) return FILE_BASE + s; // /uploads/...
+  return s; // tên file trần hoặc chuỗi khác
+}
+
+// Chuẩn hoá 1 ô chứa nhiều ảnh "url1|url2|..." thành URL tuyệt đối
+function normalizeImageCellClient(cell) {
+  return String(cell || "")
+    .split("|")
+    .map((x) => x.trim())
+    .filter(Boolean)
+    .map(toAbsUrl)
+    .join("|");
+}
+
+// ======= STATE (tối giản) =======
 const STATE = {
   sheetName: "",
-  rows: [],
-  merges: [],
-  lastQuery: "", // lấy từ topbar (ui.js)
+  rows: [], // AOA
 };
 
-function escapeHtml(str) {
-  return String(str)
+// ======= HELPERS (tối giản) =======
+function escapeHtml(s) {
+  return String(s ?? "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
 
-function generateMergedCellsMap(merges, rowCount, colCount) {
-  const hidden = Array.from({ length: rowCount }, () =>
-    Array(colCount).fill(false)
+function isImgLike(v) {
+  const s = String(v || "");
+  return (
+    /^data:image\//i.test(s) ||
+    (/^https?:\/\//i.test(s) && /\.(png|jpe?g|gif|webp|svg)(\?.*)?$/i.test(s))
   );
-  const spanMap = new Map();
-
-  merges.forEach(({ s, e }) => {
-    for (let r = s.r; r <= e.r; r++) {
-      for (let c = s.c; c <= e.c; c++) {
-        if (!(r === s.r && c === s.c)) hidden[r][c] = true;
-      }
-    }
-    spanMap.set(`${s.r}:${s.c}`, {
-      rowspan: e.r - s.r + 1,
-      colspan: e.c - s.c + 1,
-    });
-  });
-
-  return { hidden, spanMap };
 }
 
-function renderMergedTable(matrix, merges, headerRows) {
-  const rowCount = matrix.length;
-  const colCount = (matrix[0] || []).length;
-  const { hidden, spanMap } = generateMergedCellsMap(
-    merges,
-    rowCount,
-    colCount
-  );
-
-  const renderRow = (rowIdx, tag) =>
-    `<tr>` +
-    matrix[rowIdx]
-      .map((cell, colIdx) => {
-        if (hidden[rowIdx][colIdx]) return "";
-        const span = spanMap.get(`${rowIdx}:${colIdx}`) || {};
-        const attrs = [
-          span.rowspan > 1 ? `rowspan="${span.rowspan}"` : "",
-          span.colspan > 1 ? `colspan="${span.colspan}"` : "",
-        ]
-          .filter(Boolean)
-          .join(" ");
-        return `<${tag} ${attrs}>${escapeHtml(cell ?? "")}</${tag}>`;
-      })
-      .join("") +
-    `</tr>`;
-
-  const thead = matrix
-    .slice(0, FREEZE_HEADER_ROWS)
-    .map((_, r) => renderRow(r, "th"))
-    .join("");
-  const tbody = matrix
-    .slice(FREEZE_HEADER_ROWS)
-    .map((_, r) => renderRow(r + FREEZE_HEADER_ROWS, "td"))
-    .join("");
-
-  return `<table><thead>${thead}</thead><tbody>${tbody}</tbody></table>`;
+function parseImageList(val) {
+  if (!val) return [];
+  const s = String(val);
+  if (s.includes("|")) {
+    return s
+      .split("|")
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+  return isImgLike(s) ? [s] : [];
 }
 
 function adjustFreezeOffsets(previewEl) {
-  const firstRow = previewEl.querySelector("thead > tr");
-  if (!firstRow) return;
-  const height = Math.ceil(firstRow.getBoundingClientRect().height);
-  previewEl.style.setProperty("--hdr1", `${height}px`);
+  const r1 = previewEl.querySelector("thead tr:first-child");
+  if (!r1) return;
+  const h1 = Math.ceil(r1.getBoundingClientRect().height);
+  previewEl.style.setProperty("--hdr1", h1 + "px");
 }
 
+/* ========= IMAGE VIEWER (tối giản) ========= */
+function ensureImageViewer() {
+  if (document.getElementById("imgViewerModal")) return;
+
+  const wrap = document.createElement("div");
+  wrap.id = "imgViewerModal";
+  wrap.style.cssText = `
+    position: fixed; inset: 0; display: none; place-items: center;
+    background: rgba(0,0,0,.6); z-index: 9999;
+  `;
+
+  wrap.innerHTML = `
+    <div id="imgViewerBox" style="
+      width:min(92vw, 980px); height:min(88vh, 720px);
+      background: var(--card,#fff); color: var(--fg,#111);
+      border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,.3);
+      display:flex; flex-direction:column; overflow:hidden; position:relative;">
+      <div style="display:flex; align-items:center; gap:8px; padding:8px 10px; border-bottom:1px solid var(--line,#e5e7eb)">
+        <div id="imgCounter" style="font-size:12px; opacity:.7">1 / 1</div>
+        <div style="flex:1"></div>
+        <button id="imgCloseBtn" class="btn" style="padding:6px 10px; border:none">✖</button>
+      </div>
+
+      <div id="imgStage" style="position:relative; flex:1; background:#000;">
+        <iframe id="imgFrame" style="position:absolute; inset:0; width:100%; height:100%; border:0; background:#000" src="about:blank"></iframe>
+
+        <button id="imgArrowLeft" aria-label="Previous"
+          style="position:absolute; top:50%; left:8px; transform:translateY(-50%);
+                 width:40px; height:40px; border-radius:999px; border:none;
+                 background-color:transparent; font-size:40px; line-height:38px; cursor:pointer; z-index:2; color:white">
+          <
+        </button>
+
+        <button id="imgArrowRight" aria-label="Next"
+          style="position:absolute; top:50%; right:8px; transform:translateY(-50%);
+                 width:40px; height:40px; border-radius:999px; border:none;
+                 background-color:transparent; font-size:40px; line-height:38px; cursor:pointer; z-index:2; color:white">
+          >
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(wrap);
+
+  wrap.addEventListener("click", (e) => {
+    if (e.target === wrap) closeImageViewer();
+  });
+  document.getElementById("imgCloseBtn").onclick = closeImageViewer;
+  document.getElementById("imgArrowLeft").onclick = () =>
+    navigateImageViewer(-1);
+  document.getElementById("imgArrowRight").onclick = () =>
+    navigateImageViewer(1);
+
+  window.addEventListener("keydown", (e) => {
+    if (wrap.style.display !== "grid") return;
+    if (e.key === "Escape") closeImageViewer();
+    if (e.key === "ArrowLeft") navigateImageViewer(-1);
+    if (e.key === "ArrowRight") navigateImageViewer(1);
+  });
+}
+const IMG_VIEWER_STATE = { list: [], idx: 0 };
+
+function closeImageViewer() {
+  const modal = document.getElementById("imgViewerModal");
+  if (modal) modal.style.display = "none";
+  IMG_VIEWER_STATE.list = [];
+  IMG_VIEWER_STATE.idx = 0;
+}
+function navigateImageViewer(step) {
+  if (!IMG_VIEWER_STATE.list.length) return;
+  IMG_VIEWER_STATE.idx =
+    (IMG_VIEWER_STATE.idx + step + IMG_VIEWER_STATE.list.length) %
+    IMG_VIEWER_STATE.list.length;
+  renderImageViewerFrame();
+}
+function renderImageViewerFrame() {
+  const iframe = document.getElementById("imgFrame");
+  const ctr = document.getElementById("imgCounter");
+  const url = IMG_VIEWER_STATE.list[IMG_VIEWER_STATE.idx];
+  const html = `
+    <!doctype html><meta charset="utf-8"><title>Image</title>
+    <style>
+      html,body{height:100%;margin:0;background:transparent}
+      .ph{display:flex;align-items:center;justify-content:center;height:100%}
+      img{max-width:100%;max-height:100%}
+    </style>
+    <div class="ph"><img src="${url}" alt=""></div>
+  `;
+  const doc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (doc) {
+    doc.open();
+    doc.write(html);
+    doc.close();
+  }
+  if (ctr)
+    ctr.textContent = `${IMG_VIEWER_STATE.idx + 1} / ${
+      IMG_VIEWER_STATE.list.length
+    }`;
+}
+function openImageViewer(list, startIdx = 0) {
+  ensureImageViewer();
+  if (!Array.isArray(list) || !list.length) return;
+  IMG_VIEWER_STATE.list = list.slice();
+  IMG_VIEWER_STATE.idx = Math.max(0, Math.min(startIdx, list.length - 1));
+  const modal = document.getElementById("imgViewerModal");
+  if (modal) {
+    modal.style.display = "grid";
+    renderImageViewerFrame();
+  }
+}
+
+/* ======= CHUYỂN devices -> rows (AOA) ======= */
+function devicesToRows(devices = []) {
+  const rows = [[...DEVICE_COLUMNS]];
+  for (const d of devices) {
+    rows.push([
+      d?.image ?? "",
+      d?.name ?? "",
+      d?.type ?? "",
+      d?.model ?? "",
+      d?.power ?? "",
+      d?.voltage ?? "",
+      d?.capa ?? "",
+      d?.gas ?? "",
+      d?.brand ?? "",
+      d?.year ?? "",
+      d?.location ?? "",
+      d?.note ?? "",
+    ]);
+  }
+  return rows;
+}
+
+/* ======= RENDER TABLE (READ-ONLY) ======= */
+function renderTable(container) {
+  const rows = STATE.rows;
+  const R = rows.length;
+  const C = (rows[0] || []).length;
+  const hdr = Math.min(FREEZE_HEADER_ROWS, R);
+  const headers = rows.slice(0, hdr);
+  const body = rows.slice(hdr);
+
+  let html = `<table><thead>`;
+  for (let r = 0; r < hdr; r++) {
+    html += `<tr>`;
+    for (let c = 0; c < C; c++) {
+      html += `<th>${escapeHtml(headers[r][c] ?? "")}</th>`;
+    }
+    html += `</tr>`;
+  }
+  html += `</thead><tbody>`;
+
+  for (let i = 0; i < body.length; i++) {
+    html += `<tr>`;
+    for (let c = 0; c < C; c++) {
+      const raw = body[i][c] ?? "";
+
+      if (c === 0) {
+        // Cột Hình ảnh: hiển thị thumbnail đầu, click để mở viewer
+        const imgs = parseImageList(normalizeImageCellClient(raw)).map(
+          toAbsUrl
+        );
+        if (imgs.length) {
+          html += `<td>
+            <img class="thumb-one"
+                 src="${escapeHtml(imgs[0])}"
+                 data-images="${escapeHtml(imgs.join("|"))}"
+                 alt=""
+                 style="width:42px;height:42px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:pointer"/>
+          </td>`;
+        } else {
+          html += `<td>${escapeHtml(raw)}</td>`;
+        }
+      } else {
+        const v = toAbsUrl(raw);
+        if (isImgLike(v)) {
+          const text = escapeHtml(v);
+          html += `<td>
+            <div>${text}</div>
+            <img src="${text}" alt="" style="max-height:44px;display:block;margin-top:4px"/>
+          </td>`;
+        } else {
+          html += `<td>${escapeHtml(raw)}</td>`;
+        }
+      }
+    }
+    html += `</tr>`;
+  }
+  html += `</tbody></table>`;
+
+  container.innerHTML = html;
+  adjustFreezeOffsets(container);
+
+  // Viewer cho thumbnail cột Hình ảnh
+  ensureImageViewer();
+  container.querySelectorAll(".thumb-one").forEach((imgEl) => {
+    imgEl.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const list = parseImageList(imgEl.dataset.images || "").map(toAbsUrl);
+      if (list.length) openImageViewer(list, 0);
+    });
+  });
+}
+
+/* ======= PAGE RENDER (ONLY TABLE) ======= */
 export function renderInfoPage(key) {
-  const cfg = INFO_RESOURCES[key];
-  const ids = {
-    tip: `${key}-tip`,
-    preview: `${key}-preview`,
-  };
+  const ids = { tip: `${key}-tip`, prev: `${key}-preview` };
 
   return `
-    <section class="card">
-      <div class="card-h">
-        <div class="title"><span class="title-lg">${cfg.title}</span></div>
-        <!-- ĐÃ GỠ searchbar cục bộ; dùng topbar trong ui.js -->
-      </div>
+  <section class="card">
+    <div class="card-h">
+      <div class="title"><span class="title-lg">Danh sách thiết bị</span></div>
+    </div>
+    <div class="p-4">
+      <div id="${ids.tip}" class="muted">Đang tải dữ liệu...</div>
+      <div id="${ids.prev}" class="table-wrap"></div>
+    </div>
+  </section>
 
-      <div class="p-4">
-        ${renderInfoTabs(key)}
-        <div id="${ids.tip}" class="muted">Đang tải dữ liệu...</div>
-        <div id="${ids.preview}" class="table-wrap"></div>
-      </div>
-    </section>
-
-    <style>
-      #${ids.preview} {
-        margin-top: 12px;
-        max-height: 78vh;
-        overflow: auto;
-        border: 1px solid var(--line);
-        border-radius: 10px;
-        background: var(--card);
-        --hdr1: 42px;
-      }
-
-      #${ids.preview} table {
-        border-collapse: collapse;
-        width: max-content;
-        background: var(--card);
-        color: var(--fg);
-      }
-
-      #${ids.preview} th,
-      #${ids.preview} td {
-        border: 1px solid var(--line);
-        padding: 10px 12px;
-        white-space: nowrap;
-        line-height: 1.5;
-        box-sizing: border-box;
-      }
-
-      #${ids.preview} thead tr:nth-child(1) th {
-        position: sticky;
-        top: 0;
-        z-index: 6;
-        background: #f1f5f9;
-      }
-
-      #${ids.preview} thead tr:nth-child(2) th {
-        position: sticky;
-        top: var(--hdr1);
-        z-index: 5;
-        background: #f1f5f9;
-      }
-
-      body.dark-theme #${ids.preview} thead tr:nth-child(1) th,
-      body.dark-theme #${ids.preview} thead tr:nth-child(2) th {
-        background: #1f2937;
-      }
-
-      ${
-        FREEZE_FIRST_COL
-          ? `
-        #${ids.preview} th:first-child,
-        #${ids.preview} td:first-child {
-          position: sticky;
-          left: 0;
-          z-index: 7;
-          background: #f9fafb;
-        }
-
-        body.dark-theme #${ids.preview} th:first-child,
-        body.dark-theme #${ids.preview} td:first-child {
-          background: #111827;
-        }
-      `
-          : ""
-      }
-    </style>
-  `;
+  <style>
+    #${ids.prev}{ margin-top:6px; max-height:60vh; overflow:auto; border:1px solid var(--line);
+      border-radius:10px; background:var(--card); --hdr1:42px; }
+    #${ids.prev} table{ border-collapse:collapse; width:max-content; background:var(--card); color:var(--fg); }
+    #${ids.prev} th, #${ids.prev} td{ border:1px solid var(--line); padding:10px 12px; white-space:nowrap; line-height:1.5; box-sizing:border-box; }
+    #${ids.prev} thead tr:nth-child(1) th{ position:sticky; top:0; z-index:6; background:#f1f5f9; }
+    body.dark-theme #${ids.prev} thead tr:nth-child(1) th{ background:#1f2937; }
+  </style>`;
 }
 
+/* ======= BIND (ONLY LOAD DATA & RENDER) ======= */
 export function bindInfoEvents(key) {
-  if (!INFO_KEYS.has(key)) return;
-  const cfg = INFO_RESOURCES[key];
+  const tip = document.getElementById(`${key}-tip`);
+  const preview = document.getElementById(`${key}-preview`);
 
-  const tipEl = document.getElementById(`${key}-tip`);
-  const previewEl = document.getElementById(`${key}-preview`);
-  if (!previewEl) return;
-
-  // === Lọc dựa trên search bar global từ ui.js ===
-  const renderFilteredTable = () => {
-    const q = (STATE.lastQuery || "").trim().toLowerCase();
-
-    const headers = STATE.rows.slice(0, FREEZE_HEADER_ROWS);
-    const dataRows = STATE.rows.slice(FREEZE_HEADER_ROWS);
-
-    // Khi có query: giữ header, lọc body; bỏ merges (tương tự search cục bộ trước đây)
-    const filteredBody = !q
-      ? dataRows
-      : dataRows.filter((row) =>
-          row.some((cell) =>
-            String(cell ?? "")
-              .toLowerCase()
-              .includes(q)
-          )
-        );
-
-    const rowsToRender = [...headers, ...filteredBody];
-    const mergesToUse = q ? [] : STATE.merges;
-
-    previewEl.innerHTML = renderMergedTable(
-      rowsToRender,
-      mergesToUse,
-      FREEZE_HEADER_ROWS
-    );
-    adjustFreezeOffsets(previewEl);
-
-    tipEl.textContent = `Sheet: ${STATE.sheetName} — ${
-      filteredBody.length
-    } hàng ${q ? "(đã lọc)" : ""} + ${FREEZE_HEADER_ROWS} hàng header`;
-  };
-
-  // Nhận event từ topbar search (ui.js -> 'search-query-changed')
-  const onGlobalSearch = (e) => {
-    STATE.lastQuery = e.detail?.query || "";
-    renderFilteredTable();
-  };
-  window.addEventListener("search-query-changed", onGlobalSearch);
-
-  // Nếu người dùng đã gõ sẵn trên topbar, đồng bộ ngay khi vào trang
-  const topbarInput = document.getElementById("topbar-search");
-  if (topbarInput && topbarInput.value) {
-    STATE.lastQuery = topbarInput.value;
-  }
-
-  // Load dữ liệu và render lần đầu (theo query đang có)
-  loadLatestAndRender(cfg.defaultSheet).catch((err) => {
-    console.warn("Không load được sheet mặc định:", err);
-    tipEl.textContent = "Empty";
-  });
-
-  // Recalc sticky offsets khi resize
-  window.addEventListener("resize", () => adjustFreezeOffsets(previewEl), {
-    passive: true,
-  });
-
-  // --- helpers ---
-  async function loadLatestAndRender(defaultSheetName) {
+  (async function loadInitial() {
     const params = new URLSearchParams(location.search);
-    const sheetName = params.get("sheet") || defaultSheetName;
+    const targetSheet = params.get("sheet") || "THIET_BI";
 
-    tipEl.textContent = "Đang tải dữ liệu...";
-
-    let response = await fetch(cfg.latestByName(sheetName), {
-      method: "GET",
-      headers: { Accept: "application/json" },
-    });
-
-    if (response.status === 404) {
-      const fallback = await fetch(cfg.latestAny(), {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      });
-      if (fallback.ok) {
-        response = fallback;
-      } else {
-        tipEl.textContent = "Empty.";
-        previewEl.innerHTML = "";
-        return;
-      }
-    }
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.message || "Không tải được dữ liệu");
-    }
-
-    const doc = await response.json();
-    STATE.sheetName = doc.sheetName || sheetName;
-    STATE.rows = Array.isArray(doc.rows) ? doc.rows : [];
-    STATE.merges = Array.isArray(doc.merges) ? doc.merges : [];
-
-    if (!STATE.rows.length) {
-      tipEl.textContent = `Sheet "${STATE.sheetName}" hiện rỗng.`;
-      previewEl.innerHTML = "";
+    if (tip) tip.textContent = "Đang tải dữ liệu...";
+    let res;
+    try {
+      res = await fetch(
+        `${API_BASE}/api/info/latest?name=${encodeURIComponent(targetSheet)}`,
+        { headers: { Accept: "application/json" } }
+      );
+    } catch (e) {
+      console.error(e);
+      if (tip) tip.textContent = "Không kết nối được API.";
       return;
     }
 
-    renderFilteredTable();
-  }
+    if (!res.ok) {
+      STATE.sheetName = targetSheet;
+      STATE.rows = [[...DEVICE_COLUMNS]];
+      if (tip) tip.textContent = "Không tải được dữ liệu. Đã tạo sheet trống.";
+    } else {
+      const doc = await res.json();
+      STATE.sheetName = doc.sheetName || targetSheet;
 
-  // (tuỳ chọn) cleanup khi rời trang:
-  // return () => window.removeEventListener("search-query-changed", onGlobalSearch);
+      // Backend mới trả { devices: [...] }, cần chuyển sang AOA rows
+      const devices = Array.isArray(doc.devices) ? doc.devices : [];
+      STATE.rows = devicesToRows(devices);
+
+      // Chuẩn hoá cột ảnh (0) thành URL tuyệt đối trước khi render
+      const startIdx = Math.min(FREEZE_HEADER_ROWS, STATE.rows.length);
+      for (let r = startIdx; r < STATE.rows.length; r++) {
+        if (!Array.isArray(STATE.rows[r])) continue;
+        STATE.rows[r][0] = normalizeImageCellClient(STATE.rows[r][0]);
+      }
+
+      if (tip)
+        tip.textContent = `Sheet: ${STATE.sheetName} — ${
+          STATE.rows.length - FREEZE_HEADER_ROWS
+        } hàng dữ liệu + ${FREEZE_HEADER_ROWS} header`;
+    }
+
+    if (preview) renderTable(preview);
+  })();
 }

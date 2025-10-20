@@ -13,3 +13,40 @@ img{max-width:100%;display:block}
 .hidden{display:none}
 .badge{display:inline-block;border:1px solid var(--line);padding:2px 8px;border-radius:12px;background:#fff;color:var(--muted)}
 .icon{width:16px;height:16px;display:inline-block}
+
+
+/* Lưới form (tuỳ, giữ nguyên nếu bạn đã có) */
+.form-grid{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(220px,1fr));
+  gap:12px;
+}
+@media (max-width: 1024px){ .form-grid{ grid-template-columns: repeat(2, minmax(200px,1fr)); } }
+@media (max-width: 640px){  .form-grid{ grid-template-columns: 1fr; } }
+
+/* Nhãn trên – input dưới */
+.form-field{ display:flex; flex-direction:column; gap:6px; }
+.field-label{ font-size:12.5px; font-weight:600; color:var(--muted,#556); }
+.input{
+  width:100%; padding:10px 12px; border:1px solid var(--line);
+  border-radius:8px; background:var(--card); color:var(--fg); box-sizing:border-box;
+}
+.hstack{ display:flex; gap:8px; align-items:center; }
+.hstack .input{ flex:1; }              /* URL ảnh chiếm phần còn lại */
+.img-preview{
+  max-height:56px; border:1px solid var(--line);
+  border-radius:6px; margin-top:6px;
+}
+.placeholder-text {
+  color: #888;
+  font-style: normal;
+  display: block;
+  text-align: center;
+  padding: 8px;
+}
+
+.img-dropzone.has-image .placeholder-text {
+  display: none;
+}
+.img-nav-arrow:hover { background: rgba(0,0,0,.55) !important; }
+

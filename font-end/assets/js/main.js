@@ -2,49 +2,32 @@
 import { renderRoute, navigate } from "./router.js";
 import { renderHeader, renderSidebar } from "./ui.js";
 
-
 window.navigate = navigate;
 
-function isInfoPath(hash) {
-  return (hash || location.hash).startsWith("#/info/");
-}
-function getInfoTab(hash) {
-  return (
-    (hash || location.hash).replace(/^#\/info\/?/, "").split("/")[0] || "air"
-  );
-}
 const isAuthed = () => !!sessionStorage.getItem("auth_token");
 
 window.render = function () {
-  // Header/Sidebar luôn sẵn — router có thể ẩn khi ở /login bằng class no-chrome
+  // Luôn render Header/Sidebar
   const header = document.getElementById("header");
   const sidebar = document.getElementById("sidebar");
   if (header) header.innerHTML = renderHeader();
   if (sidebar) sidebar.innerHTML = renderSidebar();
 
-  renderRoute(); // render theo router (bao gồm các trang con của Info)
+  // Router sẽ quyết định trang nào hiển thị (bao gồm trang Info)
+  renderRoute();
 };
 
-window.addEventListener("DOMContentLoaded", async () => {
-  // Nếu chưa có hash: đi thẳng đến trang phù hợp theo auth
+window.addEventListener("DOMContentLoaded", () => {
+  // Nếu chưa có hash: điều hướng về trang mặc định theo trạng thái đăng nhập
   if (!location.hash) {
-    location.hash = isAuthed() ? "#/info/air" : "#/login";
+    // chỉnh route mặc định tùy bạn: THIET_BI/air...
+    location.hash = isAuthed() ? "#/info/THIET_BI" : "#/login";
   }
-
-
-
 
   window.render();
 
-  window.addEventListener("hashchange", async () => {
-    if (isAuthed() && isInfoPath()) {
-      const newTab = getInfoTab(); // ✅ đúng tên biến
-      if (newTab && newTab !== Info.tab && Info.setTab) {
-        await Info.setTab(newTab); // ✅ dùng newTab
-      } else if (!Info.items?.length && Info.load) {
-        await Info.load();
-      }
-    }
+  // Mỗi khi đổi hash, chỉ cần render lại — KHÔNG gọi Info.setTab / Info.load
+  window.addEventListener("hashchange", () => {
     window.render();
   });
 });
