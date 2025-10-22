@@ -39,13 +39,13 @@ export async function renderMaintenance() {
 
         <div id="switch-btn" style="display:flex; gap:10px; margin-left:auto">
           <button id="edit-report" class="btn primary" style="padding:8px 20px;border-radius:8px;background:#e17eee;color:black;border:none;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;height:36px">
-            <img src="assets/pictures/edit.png" alt="" width="20" height="20" />Báo cáo
+            <img src="assets/pictures/edit.png" alt="" width="20" height="20" />Report
           </button>
           <button id="update-report" class="btn primary" style="padding:8px 20px;border-radius:8px;background:#7eee8b;color:black;border:none;display:none;align-items:center;gap:8px;white-space:nowrap;height:36px">
-            <img src="assets/pictures/update.png" alt="" width="20" height="20" />Cập nhật
+            <img src="assets/pictures/update.png" alt="" width="20" height="20" />Update
           </button>
           <button id="exit" class="btn primary" style="padding:8px 20px;border-radius:8px;background:#f25a34;color:black;border:none;display:none;align-items:center;gap:8px;white-space:nowrap;height:36px">
-            <img src="assets/pictures/remove.png" alt="" width="20" height="15" />Thoát
+            <img src="assets/pictures/remove.png" alt="" width="20" height="15" />Exit
           </button>
 
           <button id="preview-report" class="btn primary" style="padding:8px 20px;border-radius:8px;background:#ffa500;color:black;border:none;display:inline-flex;align-items:center;gap:8px;white-space:nowrap;height:36px">
@@ -60,14 +60,215 @@ export async function renderMaintenance() {
       <div id="preview-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:2000; justify-content:center; align-items:center; overflow:hidden;">
         <div id="preview-shell" style="background:#fff; padding:12px 16px; border-radius:12px; display:flex; flex-direction:column; align-items:center; gap:8px;">
           <div id="preview-toolbar" style="display:flex; gap:8px; align-items:center; width:100%; justify-content:flex-end;">
-            <button id="export-img-btn" style="background:#4caf50; color:#fff; padding:6px 12px; border:none; border-radius:6px;">📷 Xuất ảnh</button>
-            <button id="close-preview-btn" style="background:#f44336; color:#fff; padding:6px 12px; border:none; border-radius:6px;">Thoát</button>
+            <button id="export-img-btn" style="background:#4caf50; color:#fff; padding:6px 12px; border:none; border-radius:6px;">📷 Export</button>
+            <button id="close-preview-btn" style="background:#f44336; color:#fff; padding:6px 12px; border:none; border-radius:6px;">Exit</button>
           </div>
           <div id="preview-viewport" style="display:flex; align-items:center; justify-content:center; background:#fff; border-radius:10px; color: black"></div>
         </div>
       </div>
     </section>
   `;
+}
+
+/* ========== EXPORT UTILS (dùng chung) ========== */
+function fixTableAlignment(root) {
+  const tables = root.querySelectorAll("table");
+  tables.forEach((tbl) => {
+    const thead = tbl.querySelector("thead");
+    const ths = thead ? Array.from(thead.querySelectorAll("th")) : [];
+    if (!ths.length) return;
+
+    const widths = ths.map((th) => Math.ceil(th.getBoundingClientRect().width));
+
+    let colgroup = tbl.querySelector("colgroup");
+    if (!colgroup) {
+      colgroup = document.createElement("colgroup");
+      tbl.insertBefore(colgroup, tbl.firstChild);
+    }
+    colgroup.innerHTML = "";
+    widths.forEach((w) => {
+      const col = document.createElement("col");
+      col.style.width = w + "px";
+      colgroup.appendChild(col);
+    });
+
+    tbl.style.tableLayout = "fixed";
+    tbl.style.borderCollapse = "separate";
+    tbl.style.borderSpacing = "0";
+
+    tbl.querySelectorAll("th, td").forEach((cell) => {
+      cell.style.whiteSpace = "nowrap";
+      cell.style.wordBreak = "normal";
+      cell.style.verticalAlign = "middle";
+      cell.style.textAlign = "center";
+      cell.style.padding = "8px 10px";
+      cell.style.lineHeight = "1.6";
+      cell.style.overflow = "visible";
+      cell.style.display = "table-cell";
+      cell.style.boxSizing = "border-box";
+    });
+  });
+}
+
+function stripProblemStyles(root) {
+  root.querySelectorAll("*").forEach((el) => {
+    const cs = getComputedStyle(el);
+    if (cs.filter && cs.filter !== "none") el.style.filter = "none";
+    if (cs.mixBlendMode && cs.mixBlendMode !== "normal")
+      el.style.mixBlendMode = "normal";
+    if (cs.backdropFilter && cs.backdropFilter !== "none")
+      el.style.backdropFilter = "none";
+  });
+}
+
+async function waitImagesAndFonts(root) {
+  const imgs = Array.from(root.querySelectorAll("img"));
+  imgs.forEach((img) => {
+    const src = img.getAttribute("src") || "";
+    if (!/^data:|^blob:/i.test(src)) img.crossOrigin = "anonymous";
+    else img.removeAttribute("crossorigin");
+    if (img.complete && img.naturalWidth === 0) {
+      const s = img.src;
+      img.src = "";
+      img.src = s;
+    }
+    img.style.background = "#fff";
+  });
+  await Promise.all(
+    imgs.map((img) =>
+      img.complete && img.naturalWidth > 0
+        ? Promise.resolve()
+        : new Promise((res) => (img.onload = img.onerror = res))
+    )
+  );
+  if (document.fonts && document.fonts.ready) {
+    try {
+      await document.fonts.ready;
+    } catch {}
+  }
+}
+
+/**
+ * Chụp ảnh: ưu tiên preview nếu đang mở; nếu không thì dựng bản export từ DOM thật.
+ */
+async function exportReportImage({
+  select,
+  dateInput,
+  previewModal,
+  previewViewport,
+  ensureHtml2Canvas,
+  buildFixedPage,
+}) {
+  const loading = document.createElement("div");
+  let exportRoot = null;
+
+  try {
+    // Overlay
+    loading.style.cssText = `
+      position:fixed;inset:0;background:rgba(0,0,0,.7);color:#fff;
+      display:flex;align-items:center;justify-content:center;
+      font-size:1.2rem;z-index:1000000000;`;
+    loading.textContent = "Đang xử lý xuất ảnh, vui lòng chờ...";
+    document.body.appendChild(loading);
+
+    const html2canvas = await ensureHtml2Canvas();
+    const type = select.value;
+    const date = dateInput.value;
+
+    // 1) Ưu tiên chụp preview nếu đang mở
+    const previewPage = previewViewport?.querySelector(".preview-page");
+    if (previewModal.style.display === "flex" && previewPage) {
+      const canvas = await html2canvas(previewPage, {
+        backgroundColor: "#ffffff",
+        scale: 2,
+        useCORS: true,
+        letterRendering: true,
+        foreignObjectRendering: false,
+        removeContainer: false,
+        scrollX: 0,
+        scrollY: 0,
+        windowWidth: previewPage.scrollWidth,
+        windowHeight: previewPage.scrollHeight,
+      });
+      const a = document.createElement("a");
+      a.download = `BaoCao-${type}-${date || "all"}-preview.png`;
+      a.href = canvas.toDataURL("image/png");
+      a.click();
+      return;
+    }
+
+    // 2) Fallback: chụp toàn nội dung (không cần mở preview)
+    const containerEl = document.getElementById("report-container");
+    const liveClone = containerEl.cloneNode(true);
+
+    // (Tuỳ trang) AHU có normalize ảnh: nếu đã gắn global thì gọi
+    if (
+      type === "filterAHU" &&
+      typeof window.normalizeAHUImageCells === "function"
+    ) {
+      try {
+        window.normalizeAHUImageCells(liveClone);
+      } catch {}
+    }
+
+    // staging offscreen
+    exportRoot = document.createElement("div");
+    exportRoot.style.cssText = `position:absolute;top:-9999px;left:-9999px;z-index:-1;background:#fff;`;
+    document.body.appendChild(exportRoot);
+
+    // build fixed page
+    const { page } = buildFixedPage(type, date, liveClone, { forExport: true });
+    page.style.background = "#fff";
+    exportRoot.appendChild(page);
+
+    // style vá export
+    const styleFix = document.createElement("style");
+    styleFix.textContent = `
+      html, body, .preview-page { background:#fff !important; }
+      .preview-page, .preview-page * {
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        color:#000 !important;
+        background-clip: border-box !important;
+      }
+      table { border-collapse:separate!important; border-spacing:0!important; }
+      th, td { overflow:visible!important; height:auto!important; max-height:none!important; }
+    `;
+    page.appendChild(styleFix);
+
+    stripProblemStyles(page);
+    fixTableAlignment(page);
+
+    // chờ layout ổn định
+    await new Promise((r) => requestAnimationFrame(r));
+    page.__applyScale?.();
+    await new Promise((r) => requestAnimationFrame(r));
+
+    await waitImagesAndFonts(page);
+    await new Promise((r) => setTimeout(r, 60));
+
+    const canvas = await html2canvas(page, {
+      backgroundColor: "#ffffff",
+      scale: 2,
+      useCORS: true,
+      letterRendering: true,
+      foreignObjectRendering: false,
+      removeContainer: false,
+      scrollX: 0,
+      scrollY: 0,
+      windowWidth: page.scrollWidth,
+      windowHeight: page.scrollHeight,
+    });
+
+    const a = document.createElement("a");
+    a.download = `BaoCao-${type}-${date || "all"}.png`;
+    a.href = canvas.toDataURL("image/png");
+    a.click();
+  } finally {
+    if (document.body.contains(loading)) document.body.removeChild(loading);
+    if (exportRoot && exportRoot.parentNode)
+      exportRoot.parentNode.removeChild(exportRoot);
+  }
 }
 
 /* ------------------------ SỰ KIỆN + LOGIC CHUNG ------------------------ */
@@ -83,7 +284,7 @@ export function setupReportEvents() {
   if (!select || !container || !dateInput || !title || !updateBtn) return;
 
   // ====== CONFIG: kích thước trang cố định trong preview & export ======
-  const PAGE_W = 600; // px (bạn yêu cầu)
+  const PAGE_W = 600; // px
   const PAGE_H = 850; // px
 
   /* ---------- Helpers cho Preview cố định 160x600 ---------- */
@@ -105,35 +306,21 @@ export function setupReportEvents() {
   function buildHeaderEl(type, dateStr) {
     const wrap = document.createElement("div");
     wrap.style.cssText = `
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 12px;
-    width: 100%;
-    text-align: center;
-    color: #ffffffff;
-  `;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; padding-top: 6px;
+      margin-bottom: 12px; width: 100%; text-align: center; color: #000000ff; position: relative; z-index: 2;
+    `;
 
     const titleDiv = document.createElement("div");
     titleDiv.textContent = titleFor(type);
     titleDiv.style.cssText = `
-    font-size: 20px;
-    font-weight: 800;
-    letter-spacing: 0.3px;
-    color: #000;
-  `;
-
+      font-size: 20px; font-weight: 800; letter-spacing: 0.3px; color: #000; line-height:1.25; transform: translateZ(0);
+    `;
     wrap.appendChild(titleDiv);
 
     if (dateStr) {
       const dateDiv = document.createElement("div");
       dateDiv.textContent = `Ngày: ${String(dateStr).replace(/-/g, "/")}`;
-      dateDiv.style.cssText = `
-      margin-top: 6px;
-      font-weight: 600;
-      color: #000;
-    `;
+      dateDiv.style.cssText = `margin-top: 6px; font-weight: 600; color: #000; line-height:1.2`;
       wrap.appendChild(dateDiv);
     }
 
@@ -171,15 +358,14 @@ export function setupReportEvents() {
         el.style.position = "static";
         el.style.top = "auto";
         el.style.zIndex = "auto";
-        el.style.color = "var(--fg)"; // ✅ KHÔNG dùng #f6f5f5ff
-        el.style.setProperty("-webkit-text-fill-color", "var(--fg)");
+        el.style.color = "#000";
+        el.style.setProperty("-webkit-text-fill-color", "#000");
       });
 
-    // ✅ Căn giữa nội dung trong tất cả thẻ <th> và <td>
     root.querySelectorAll("th, td").forEach((el) => {
       el.style.textAlign = "center";
       el.style.verticalAlign = "middle";
-      el.style.display = "table-cell"; // đảm bảo đúng kiểu hiển thị
+      el.style.display = "table-cell";
       el.style.lineHeight = "1.5";
     });
 
@@ -189,8 +375,7 @@ export function setupReportEvents() {
     });
   }
 
-  // Tạo "page" cố định 160x600 và scale inner để lọt trọn
-  // Thay thế nguyên hàm cũ bằng hàm này
+  // Tạo "page" cố định và scale inner để lọt trọn
   function buildFixedPage(
     type,
     date,
@@ -200,69 +385,59 @@ export function setupReportEvents() {
     const page = document.createElement("div");
     page.className = "preview-page";
 
-    // --- KHUNG PAGE CƠ BẢN ---
     let pageCss = `
-    position: relative;
-    background: #fff;
-    border: 1px solid #e5e7eb;
-    border-radius: 10px;
-    box-shadow: 0 10px 30px rgba(0,0,0,.08);
-    padding: 0px;
-  `;
+      position: relative; background: #fff; border: none;
+      box-shadow: 0 10px 30px rgba(0,0,0,.08); padding: 12px 20px 16px;
+    `;
 
     if (forExport) {
-      // Khi xuất ảnh: cho phép co dãn theo nội dung, không giới hạn overflow
-      pageCss += `
-      display: inline-block;
-      overflow: visible;
-      width: 1150px;
-    `;
+      pageCss += `display: inline-block; overflow: visible; width: 1150px;`;
     } else {
-      // Khi xem preview: cố định chiều rộng
-      pageCss += `
-      width: 1150px;
-      overflow: hidden;
-    `;
+      pageCss += `width: 1150px; overflow: hidden;`;
     }
 
-    page.style.cssText = pageCss;
-
-    // --- INNER WRAP ---
     const inner = document.createElement("div");
-    inner.style.cssText = `
-    position:absolute;
-    left:0; top:0;
-    transform-origin: top left;
-    display:inline-block;
-  `;
+    inner.style.cssText = `position:absolute; left:0; top:0; transform-origin: top left; display:inline-block`;
 
-    // --- BUILD NỘI DUNG ---
     const wrap = document.createElement("div");
     wrap.appendChild(buildHeaderEl(type, date));
 
     const bodyWrap = document.createElement("div");
+    if (containerHTML instanceof Node) bodyWrap.appendChild(containerHTML);
+    else bodyWrap.innerHTML = containerHTML;
 
-    // ✅ Cho phép truyền Node hoặc HTML string
-    if (containerHTML instanceof Node) {
-      bodyWrap.appendChild(containerHTML); // Gắn trực tiếp node clone
-    } else {
-      bodyWrap.innerHTML = containerHTML; // Fallback cho chuỗi HTML
-    }
-
-    cleanupPreviewDom(bodyWrap); // Giữ nguyên xử lý style
+    cleanupPreviewDom(bodyWrap);
     wrap.appendChild(bodyWrap);
 
     inner.appendChild(wrap);
     page.appendChild(inner);
 
-    // --- SCALE VÀ CAO ĐỘ ---
+    const style = document.createElement("style");
+    style.textContent = `
+    .preview-page table {
+      border: 1px solid #000;
+    }
+
+    .preview-page th {
+      border: 1px solid #000;
+      background-color: transparent;
+
+    }
+    .preview-page td {
+      border: 1px solid #000;
+
+    }
+
+ 
+  `;
+    page.appendChild(style);
+
     page.__applyScale = () => {
       if (forExport) {
         inner.style.transform = "none";
-        page.style.height = wrap.scrollHeight + "px"; // cao theo nội dung thực
+        page.style.height = wrap.scrollHeight + "px";
         return;
       }
-
       inner.style.transform = "none";
       const w = wrap.offsetWidth;
       const h = wrap.offsetHeight;
@@ -317,8 +492,7 @@ export function setupReportEvents() {
   const yyyy = today.getFullYear();
   const mm = String(today.getMonth() + 1).padStart(2, "0");
   const dd = String(today.getDate()).padStart(2, "0");
-  if (select.value !== "maintenanceReport")
-    dateInput.value = `${yyyy}-${mm}-${dd}`;
+  if (select.value == "filterAHU") dateInput.value = `${yyyy}-${mm}-${dd}`;
   else dateInput.value = "";
 
   const map = {
@@ -375,7 +549,7 @@ export function setupReportEvents() {
   }
 
   select.addEventListener("change", () => {
-    if (select.value === "maintenanceReport") {
+    if (select.value !== "filterAHU") {
       dateInput.value = "";
     } else {
       const t = new Date();
@@ -446,16 +620,11 @@ export function setupReportEvents() {
     document.getElementById("exit").style.display = "none";
     document.getElementById("edit-report").style.display = "inline-flex";
     document.getElementById("add-task-btn").style.display = "none";
-    if (select.value === "maintenanceReport") {
+    if (select.value === "maintenanceReport")
       window.__setMaintenanceEditMode?.(false);
-    }
-    if (select.value === "monthlywork") {
-      window.__setInspectionEditMode?.(false);
-    }
-    if (select.vale === "generatorReport") {
+    if (select.value === "monthlywork") window.__setInspectionEditMode?.(false);
+    if (select.value === "generatorReport")
       window.__setGeneratorEditMode?.(false);
-    }
-
     await renderSelectedReport();
   });
 
@@ -491,7 +660,6 @@ export function setupReportEvents() {
     const { page, inner } = buildFixedPage(type, date, container.innerHTML, {
       forExport: false,
     });
-
     previewViewport.appendChild(page);
 
     // Ẩn scroll — chỉ pan bằng transform
@@ -517,12 +685,12 @@ export function setupReportEvents() {
       if (e.ctrlKey) {
         e.preventDefault();
         scale += e.deltaY < 0 ? zoomStep : -zoomStep;
-        scale = Math.max(0.2, Math.min(scale, 5)); // giới hạn zoom
+        scale = Math.max(0.2, Math.min(scale, 5));
         applyTransform();
       }
     });
 
-    // ===== Pan bằng click chuột =====
+    // Pan
     previewViewport.addEventListener("mousedown", (e) => {
       isDragging = true;
       previewViewport.style.cursor = "grabbing";
@@ -558,184 +726,41 @@ export function setupReportEvents() {
   previewBtn?.addEventListener("click", openPreview);
   closePreviewBtn?.addEventListener("click", closePreview);
 
-  /* ------------------------------ EXPORT PNG 160×600 ------------------------------ */
-  // === Export PNG từ PREVIEW: chụp nguyên trạng, KHÔNG scale/transform DOM gốc ===
-  /* ------------------------------ EXPORT PNG TOÀN BỘ NỘI DUNG ------------------------------ */
-
+  /* ------------------------------ EXPORT PNG ------------------------------ */
+  // ——— GỌN: handler chỉ gọi util exportReportImage ———
   exportImgBtn?.addEventListener("click", async () => {
-    const loading = document.createElement("div");
-    let exportRoot = null;
-
-    // --- helper: cố định cột theo thead ---
-    function fixTableAlignment(page) {
-      const tables = page.querySelectorAll("table");
-      tables.forEach((tbl) => {
-        const thead = tbl.querySelector("thead");
-        const ths = thead ? Array.from(thead.querySelectorAll("th")) : [];
-        if (!ths.length) return;
-
-        // đo width thật của từng <th>
-        const widths = ths.map((th) =>
-          Math.ceil(th.getBoundingClientRect().width)
-        );
-
-        // tạo/ghi <colgroup> với width cố định
-        let colgroup = tbl.querySelector("colgroup");
-        if (!colgroup) {
-          colgroup = document.createElement("colgroup");
-          tbl.insertBefore(colgroup, tbl.firstChild);
-        }
-        colgroup.innerHTML = "";
-        widths.forEach((w) => {
-          const col = document.createElement("col");
-          col.style.width = w + "px";
-          colgroup.appendChild(col);
-        });
-
-        // chuẩn hoá bảng và ô
-        tbl.style.tableLayout = "fixed";
-        tbl.style.borderCollapse = "separate"; // tránh clipping đường viền
-        tbl.style.borderSpacing = "0";
-        tbl.querySelectorAll("th, td").forEach((cell) => {
-          cell.style.whiteSpace = "nowrap";
-          cell.style.wordBreak = "normal";
-          cell.style.verticalAlign = "middle";
-          cell.style.textAlign = "center";
-          cell.style.padding = "8px 10px";
-          cell.style.lineHeight = "1.6"; // vá baseline -> không bị “ăn” chữ
-          cell.style.overflow = "visible";
-          cell.style.display = "table-cell"; // đảm bảo đúng loại ô
-          cell.style.boxSizing = "border-box";
-        });
-      });
-    }
-
     try {
-      // ===== Overlay =====
-      loading.style.cssText = `
-      position:fixed;inset:0;background:rgba(0,0,0,.7);color:#fff;
-      display:flex;align-items:center;justify-content:center;
-      font-size:1.2rem;z-index:1000000000;`;
-      loading.textContent = "Đang xử lý xuất ảnh, vui lòng chờ...";
-      document.body.appendChild(loading);
-
-      // ===== Chuẩn bị =====
-      const html2canvas = await ensureHtml2Canvas();
       const type = select.value;
-      const date = dateInput.value;
+      const date = dateInput.value || "TẤT CẢ NGÀY";
 
-      // Clone DOM thật (không ảnh hưởng preview)
-      const containerEl = document.getElementById("report-container");
-      const liveClone = containerEl.cloneNode(true);
-
-      // Chỉ AHU: nới ô ảnh ở bản clone nếu có
       if (
         type === "filterAHU" &&
-        typeof normalizeAHUImageCells === "function"
+        typeof window.exportFilterAHUToPNG === "function"
       ) {
-        normalizeAHUImageCells(liveClone);
-      }
+        const fileName = `BaoCao-${type}-${date}.png`;
+        const title = "BÁO CÁO THAY THẾ OA FILTER AHU";
+        const dateText = date;
 
-      // Root ẩn để trình duyệt tính layout (nền trắng để tránh canvas đen)
-      exportRoot = document.createElement("div");
-      exportRoot.style.cssText = `position:absolute;top:-9999px;left:-9999px;z-index:-1;background:#fff;`;
-      document.body.appendChild(exportRoot);
-
-      // Dựng trang export từ clone
-      const { page } = buildFixedPage(type, date, liveClone, {
-        forExport: true,
-      });
-      page.style.background = "#fff";
-      exportRoot.appendChild(page);
-
-      // CSS vá chỉ dùng cho bản export
-      const styleFix = document.createElement("style");
-      styleFix.textContent = `
-      html, body, .preview-page { background:#fff !important; }
-      .preview-page, .preview-page * {
-        -webkit-font-smoothing: antialiased;
-        text-rendering: optimizeLegibility;
-        color:#000 !important;
-        background-clip: border-box !important;
-      }
-      table { border-collapse:separate!important; border-spacing:0!important; }
-      th, td { overflow:visible!important; height:auto!important; max-height:none!important; }
-    `;
-      page.appendChild(styleFix);
-
-      // Gỡ các style có thể gây render đen (Safari/WebKit)
-      (function stripProblemStyles(root) {
-        root.querySelectorAll("*").forEach((el) => {
-          const cs = getComputedStyle(el);
-          if (cs.filter && cs.filter !== "none") el.style.filter = "none";
-          if (cs.mixBlendMode && cs.mixBlendMode !== "normal")
-            el.style.mixBlendMode = "normal";
-          if (cs.backdropFilter && cs.backdropFilter !== "none")
-            el.style.backdropFilter = "none";
+        await window.exportFilterAHUToPNG({
+          fileName,
+          titleText: title,
+          dateStr: dateText,
         });
-      })(page);
-
-      // >>> CỐ ĐỊNH CỘT & VÁ “ĂN CHỮ”
-      fixTableAlignment(page);
-
-      // Đợi layout ổn định
-      await new Promise((r) => requestAnimationFrame(r));
-      page.__applyScale?.();
-      await new Promise((r) => requestAnimationFrame(r));
-
-      // Đảm bảo ảnh đã sẵn sàng
-      const imgs = Array.from(page.querySelectorAll("img"));
-      imgs.forEach((img) => {
-        const src = img.getAttribute("src") || "";
-        if (!/^data:|^blob:/i.test(src)) img.crossOrigin = "anonymous";
-        else img.removeAttribute("crossorigin");
-        if (img.complete && img.naturalWidth === 0) {
-          const s = img.src;
-          img.src = "";
-          img.src = s;
-        }
-        img.style.background = "#fff";
-      });
-      await Promise.all(
-        imgs.map((img) =>
-          img.complete && img.naturalWidth > 0
-            ? Promise.resolve()
-            : new Promise((res) => (img.onload = img.onerror = res))
-        )
-      );
-      if (document.fonts && document.fonts.ready) {
-        try {
-          await document.fonts.ready;
-        } catch {}
+        return;
       }
-      await new Promise((r) => setTimeout(r, 60));
 
-      // Chụp ảnh (KHÔNG dùng foreignObject để tránh nền đen)
-      const canvas = await html2canvas(page, {
-        backgroundColor: "#ffffff",
-        scale: 2,
-        useCORS: true,
-        letterRendering: true,
-        foreignObjectRendering: false,
-        removeContainer: false,
-        scrollX: 0,
-        scrollY: 0,
-        windowWidth: page.scrollWidth,
-        windowHeight: page.scrollHeight,
+      // Trường hợp khác
+      await exportReportImage({
+        select,
+        dateInput,
+        previewModal,
+        previewViewport,
+        ensureHtml2Canvas,
+        buildFixedPage,
       });
-
-      // Tải file
-      const a = document.createElement("a");
-      a.download = `BaoCao-${type}-${date || "all"}.png`;
-      a.href = canvas.toDataURL("image/png");
-      a.click();
     } catch (e) {
       console.error("Export error:", e);
       alert("Đã xảy ra lỗi khi xuất ảnh. Vui lòng thử lại.");
-    } finally {
-      if (document.body.contains(loading)) document.body.removeChild(loading);
-      if (exportRoot && exportRoot.parentNode)
-        exportRoot.parentNode.removeChild(exportRoot);
     }
   });
 

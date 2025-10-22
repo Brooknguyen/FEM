@@ -6,9 +6,23 @@ const API_BASE = "http://10.100.201.25:4000/api/generator";
  */
 export function rendergeneratorReport(date) {
   const html = `
-    <div style="overflow-x: auto; width: 100%;">
-      <table class="table-report" border="1" cellspacing="0" cellpadding="4"
-             style="border-collapse: collapse; width: max-content; min-width: 100%; text-align: center;">
+    <!-- Thêm id cho vùng bọc bảng để có thể export -->
+    <div id="generator-report-wrapper" style="overflow-x: auto; width: 100%;">
+      <style>
+        .table-report {
+          border-collapse: collapse;
+          width: max-content;
+          min-width: 100%;
+          text-align: center;
+          border: 1px solid var(--fg);
+        }
+        .table-report th,
+        .table-report td {
+          border: 1px solid var(--fg);
+          padding: 4px;
+        }
+      </style>
+      <table class="table-report" cellspacing="0" cellpadding="4">
         <thead>
           <tr>
             <th rowspan="2">No</th>
@@ -26,7 +40,6 @@ export function rendergeneratorReport(date) {
             <th rowspan="2">Lượng sử dụng dầu (L)</th>
             <th rowspan="2">Engine run time</th>
             <th rowspan="2">Ghi chú/ Sự cố</th>
-            <!-- KHÔNG thêm th "Thao tác" cố định; sẽ thêm/đổi động bằng code -->
           </tr>
           <tr>
             <th>RS (V)</th>
@@ -512,3 +525,119 @@ export async function submitGeneratorData(date) {
     throw error;
   }
 }
+
+/* ================== EXPORT ẢNH ================== */
+/**
+ * 1) Chụp **toàn bộ bảng** (kể cả phần bị overflow-x) -> luôn full cột.
+ *    Dùng khi bạn muốn ảnh chứa toàn bộ dữ liệu bảng.
+ *
+ * Yêu cầu: html2canvas đã được load (window.html2canvas).
+ */
+export async function exportGeneratorReportAsImage({
+  fileName = "generator-report.png",
+  fitWidth = 1400, // null để giữ kích thước thật; nếu có, tự scale cho vừa bề rộng này
+  renderScale = 2,
+  minScale = 0.5,
+} = {}) {
+  if (typeof html2canvas !== "function") {
+    alert("Thiếu html2canvas. Hãy import thư viện trước khi xuất ảnh.");
+    return;
+  }
+
+  const src = document.getElementById("generator-report-wrapper");
+  if (!src) {
+    alert("Không tìm thấy vùng bảng để xuất ảnh");
+    return;
+  }
+
+  // Clone để không ảnh hưởng UI và bỏ overflow
+  const clone = src.cloneNode(true);
+  clone.id = "";
+  clone.style.overflow = "visible";
+  clone.style.width = "auto";
+  clone.style.maxWidth = "none";
+
+  // Stage tạm ngoài viewport
+  const stage = document.createElement("div");
+  stage.style.position = "fixed";
+  stage.style.left = "-100000px";
+  stage.style.top = "0";
+  stage.style.background = "white";
+  stage.appendChild(clone);
+  document.body.appendChild(stage);
+
+  await new Promise((r) => requestAnimationFrame(r));
+
+  const table = clone.querySelector(".table-report") || clone;
+  const fullW = table.scrollWidth;
+  const fullH = table.scrollHeight;
+
+  let scale = 1;
+  if (fitWidth && fullW > fitWidth) {
+    scale = Math.max(minScale, fitWidth / fullW);
+  }
+  clone.style.transformOrigin = "top left";
+  clone.style.transform = `scale(${scale})`;
+
+  stage.style.width = Math.ceil(fullW * scale) + "px";
+  stage.style.height = Math.ceil(fullH * scale) + "px";
+
+  try {
+    const canvas = await html2canvas(stage, {
+      backgroundColor: "#ffffff",
+      scale: renderScale,
+      useCORS: true,
+      logging: false,
+    });
+    const url = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+  } finally {
+    document.body.removeChild(stage);
+  }
+}
+
+/**
+ * 2) Chụp **đúng khung preview đang hiển thị** (như ảnh bạn gửi).
+ *    Dùng khi bạn muốn lấy hình ảnh “preview đã thu nhỏ sẵn” (header/tiêu đề/nút, v.v.).
+ *
+ * - Đặt id cho container của preview, ví dụ: id="generator-preview"
+ *   (bao quanh phần tiêu đề + bảng đã scale để xem).
+ * - Gọi: exportPreviewAsImage("#generator-preview")
+ */
+export async function exportPreviewAsImage(
+  selector = "#generator-preview",
+  { fileName = "generator-preview.png", renderScale = 2 } = {}
+) {
+  if (typeof html2canvas !== "function") {
+    alert("Thiếu html2canvas. Hãy import thư viện trước khi xuất ảnh.");
+    return;
+  }
+
+  const el =
+    typeof selector === "string" ? document.querySelector(selector) : selector;
+  if (!el) {
+    alert("Không tìm thấy phần tử preview để xuất ảnh");
+    return;
+  }
+
+  // Chụp y nguyên những gì đang thấy (giữ các transform/scale của preview)
+  const canvas = await html2canvas(el, {
+    backgroundColor: "#ffffff",
+    scale: renderScale,
+    useCORS: true,
+    logging: false,
+  });
+
+  const url = canvas.toDataURL("image/png");
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  a.click();
+}
+
+// (tùy chọn) gán global cho tiện thử nhanh:
+// window.__exportGenFull = (opts) => exportGeneratorReportAsImage(opts);
+// window.__exportGenPreview = (sel, opts) => exportPreviewAsImage(sel, opts);

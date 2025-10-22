@@ -5,6 +5,36 @@ export async function renderMaintenanceReport(date) {
   const html = `
 
     <table class="table-report">
+      <style>
+          .table-report {
+            border-collapse: collapse;
+            width: max-content;
+            min-width: 100%;
+            text-align: center;
+            line-height: 1.35;
+            min-height: 34px;
+            border: 1px solid var(--fg);
+          }
+          .table-report td, .table-report th {
+            vertical-align: middle;
+            border: 1px solid var(--fg);
+            padding: 8px;
+          }
+          .table-report .cell-input {
+            display: block;
+            width: 100%;
+            min-width: 0;
+            box-sizing: border-box;
+            padding: 6px 8px;
+            border: none;
+            border-radius: 6px;
+            background: transparent;
+            color: var(--fg);
+            outline: none;
+          }
+          .table-report tr:last-child td { border-bottom: none; }
+          .table-report td:last-child   { border-right: none; }
+        </style>
       <thead>
         <tr>
           <th>No</th>

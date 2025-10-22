@@ -277,7 +277,7 @@ function renderChatPopup() {
   const html = `
   <div id="chat-popup" style="
     position: fixed; right:20px; bottom: 24px; z-index: 1000;
-    width: 360px; max-height: 70vh; display: none;
+    width: 360px; max-height: 46vh; display: none;
     border-radius: 12px; overflow: hidden;
     box-shadow: 0 12px 30px rgba(0,0,0,.18);
     background: var(--card,#fff); color: var(--fg,#111);
@@ -290,7 +290,7 @@ function renderChatPopup() {
     </div>
 
     <div id="messages" style="
-      padding: 12px; overflow:auto; max-height: 46vh;
+      padding: 12px; overflow:auto; max-height: 34vh;
       background: var(--card,#fff);
     "></div>
 
@@ -299,7 +299,7 @@ function renderChatPopup() {
         flex:1; border:1px solid var(--line,#e5e7eb); border-radius:8px;
         padding:10px 12px; background:var(--card,#fff); color:var(--fg,#111);
       ">
-      <button id="send-btn" class="btn primary" style="white-space: nowrap;">Gửi</button>
+      <button id="send-btn" class="btn primary" style="white-space: nowrap;">Send</button>
     </div>
   </div>
   `;
@@ -323,6 +323,12 @@ function openChat() {
   const { popup, input } = getChatEls();
   if (!popup) return;
   popup.style.display = "block";
+
+  messages.innerHTML = "";
+  addMessage(
+    "👋 Chào bạn! Trợ lý AI đây — mình có thể giúp gì cho bạn không?",
+    false
+  );
   setTimeout(() => input && input.focus(), 150);
 }
 

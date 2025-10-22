@@ -607,8 +607,8 @@ function renderTable(container) {
     }
 
     html += `<td class="actions-cell">
-              <button type="button" class="btn-xxs row-edit btn primary" data-bi="${i}">✏️ Sửa</button>
-              <button type="button" class="btn-xxs row-del btn primary"  data-bi="${i}" style="background-color: red; border:none">🗑️ Xóa</button>
+              <button type="button" class="btn-xxs row-edit btn primary" data-bi="${i}">✏️ Edit</button>
+              <button type="button" class="btn-xxs row-del btn primary"  data-bi="${i}" style="background-color: red; border:none">🗑️ Delete</button>
             </td>`;
     html += `</tr>`;
   }
@@ -733,7 +733,7 @@ export function renderCrudInfoPage(key) {
   return `
   <section class="card">
     <div class="card-h"><div class="title"><span class="title-lg">${
-      cfg?.title || "Thêm thông tin thiết bị"
+      cfg?.title || "Add New Machine"
     }</span></div></div>
     <div class="p-4">
 
@@ -745,7 +745,7 @@ export function renderCrudInfoPage(key) {
             ids.file
           }" accept=".xlsx,.xls" style="display:none" />
           <button class="btn js-import" id="${ids.import}">📥 Import</button>
-          <button class="btn js-add" id="${ids.add}" disabled>➕ Thêm</button>
+          <button class="btn js-add" id="${ids.add}" disabled>➕ Add</button>
           <div style="flex:1"></div>
         </div>
       </div>

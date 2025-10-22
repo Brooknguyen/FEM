@@ -155,20 +155,15 @@ export async function renderFilterReport(date) {
       <td>${item.content}</td>
 
       <td>
-        <input
-          id="result-${index}"
-          type="text"
-          value="${item.result || "OK"}"
-          disabled
-          style="padding:6px 8px; border:none; border-radius:6px; background-color: transparent; color: var(--fg); width: 60px"
-        />
+        <input id="result-${index}" class="cell-input" type="text" value="${
+        item.result || "OK"
+      }" disabled />
       </td>
 
       <td>
-        <input id="person-${index}" type="text" value="${
+        <input id="person-${index}" class="cell-input" type="text" value="${
         item.personInCharge || ""
-      }"
-               disabled style="padding:6px 8px; border:none; width:180px; background-color: transparent; color: var(--fg)"/>
+      }" disabled />
       </td>
 
       <!-- Ảnh trước -->
@@ -197,17 +192,47 @@ export async function renderFilterReport(date) {
 
   const html = `
     <div style="overflow-x:auto; max-height: 750px; overflow-y:auto;">
+      <style>
+        .table-report {
+          border-collapse: collapse;
+          width: max-content;
+          min-width: 100%;
+          text-align: center;
+          line-height: 1.35;
+          min-height: 34px;
+          border: 1px solid var(--fg);
+        }
+        .table-report td, .table-report th {
+          vertical-align: middle;
+          border: 1px solid var(--fg);
+          padding: 8px;
+        }
+        .table-report .cell-input {
+          display: block;
+          width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+          padding: 6px 8px;
+          border: none;
+          border-radius: 6px;
+          background: transparent;
+          color: var(--fg);
+          outline: none;
+        }
+        .table-report tr:last-child td { border-bottom: none; }
+        .table-report td:last-child   { border-right: none; }
+      </style>
       <table class="table-report" style="width:100%; border-collapse: collapse; text-align:left">
         <thead style="position: sticky; top: 0; z-index: 10; background-color: #fff;">
           <tr>
-            <th style="padding:8px; border:1px solid #ccc">STT</th>
-            <th style="padding:8px; border:1px solid #ccc">Tên máy</th>
-            <th style="padding:8px; border:1px solid #ccc">Tên phòng</th>
-            <th style="padding:8px; border:1px solid #ccc">Nội dung bảo dưỡng</th>
-            <th style="padding:8px; border:1px solid #ccc">Kết quả</th>
-            <th style="padding:8px; border:1px solid #ccc">Người thực hiện</th>
-            <th style="padding:8px; border:1px solid #ccc">Hình ảnh trước</th>
-            <th style="padding:8px; border:1px solid #ccc">Hình ảnh sau</th>
+            <th>STT</th>
+            <th>Tên máy</th>
+            <th>Tên phòng</th>
+            <th>Nội dung bảo dưỡng</th>
+            <th>Kết quả</th>
+            <th>Người thực hiện</th>
+            <th>Hình ảnh trước</th>
+            <th>Hình ảnh sau</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -271,17 +296,14 @@ export async function renderFilterReport(date) {
       const afterBox = document.getElementById(`after-upload-box-${index}`);
       const afterRemove = document.getElementById(`after-remove-${index}`);
 
-      // Hiển thị ảnh từ server (nếu có)
       if (item.pictureBefore)
         showImage(beforeBox, beforeRemove, item.pictureBefore);
       if (item.pictureAfter)
         showImage(afterBox, afterRemove, item.pictureAfter);
 
-      // Ẩn nút xóa mặc định khi chưa bật edit mode
       if (beforeRemove) beforeRemove.style.display = "none";
       if (afterRemove) afterRemove.style.display = "none";
 
-      // Click box => trigger input (khi đã bật edit mode)
       if (beforeBox && beforeInput) {
         beforeBox.addEventListener("click", () => {
           if (!beforeInput.disabled) beforeInput.click();
@@ -293,7 +315,6 @@ export async function renderFilterReport(date) {
         });
       }
 
-      // Preview khi chọn file
       if (beforeInput && beforeBox && beforeRemove) {
         beforeInput.addEventListener("change", (e) => {
           const file = e.target.files?.[0];
@@ -318,7 +339,6 @@ export async function renderFilterReport(date) {
         });
       }
 
-      // Xoá ảnh
       if (beforeRemove && beforeInput && beforeBox) {
         beforeRemove.addEventListener("click", (e) => {
           e.stopPropagation();
@@ -342,7 +362,6 @@ export async function renderFilterReport(date) {
       }
     });
 
-    // ===== BẬT/TẮT EDIT MODE =====
     window.currentReportEnableEdit = () => {
       data.forEach((_, i) => {
         const personEl = document.getElementById(`person-${i}`);
@@ -401,11 +420,9 @@ export async function renderFilterReport(date) {
       });
     };
 
-    // ✅ THU THẬP & GỬI DỮ LIỆU (CREATE/UPDATE theo ngày)
     window.currentReportCollectAndSubmit = async (dateStr) => {
       const form = new FormData();
 
-      // Thu thập các trường text từ DOM (đảm bảo lấy đúng giá trị khi user đã chỉnh)
       const items = data.map((row, i) => {
         const resultEl = document.getElementById(`result-${i}`);
         const personEl = document.getElementById(`person-${i}`);
@@ -423,7 +440,6 @@ export async function renderFilterReport(date) {
 
       form.append("items", JSON.stringify(items));
 
-      // Gắn file nếu có (đặt tên đúng chuẩn mà backend đang đọc: before-<no>, after-<no>)
       for (let i = 0; i < data.length; i++) {
         const no = items[i].no;
         const beforeInput = document.getElementById(`before-file-${i}`);
@@ -446,9 +462,143 @@ export async function renderFilterReport(date) {
       return res.json().catch(() => ({}));
     };
 
-    // Tắt edit mode mặc định
     window.currentReportDisableEdit();
   }, 0);
+
+  // ====== EXPORT ẢNH: chụp bảng mà không bị mất chữ trong INPUT ======
+  window.exportFilterAHUToPNG = async function exportFilterAHUToPNG({
+    fileName = "BaoCao-filterAHU.png",
+    titleText = "BÁO CÁO THAY THẾ OA FILTER AHU",
+    dateStr = "",
+  } = {}) {
+    const table = document.querySelector(".table-report");
+    if (!table) return alert("Không tìm thấy bảng để xuất ảnh.");
+
+    // --- clone bảng ---
+    const tableWrap = table.parentElement || table;
+    const cloneTableWrap = tableWrap.cloneNode(true);
+
+    // kích thước và nền
+    const wrapRect = tableWrap.getBoundingClientRect();
+    cloneTableWrap.style.width = wrapRect.width + "px";
+    cloneTableWrap.style.maxHeight = "unset";
+    cloneTableWrap.style.overflow = "visible";
+    cloneTableWrap.style.background = "#fff";
+
+    // input -> div tĩnh
+    cloneTableWrap
+      .querySelectorAll('input[type="text"], input:not([type])')
+      .forEach((inp) => {
+        const holder = document.createElement("div");
+        const cs = getComputedStyle(inp);
+        holder.textContent = inp.value || inp.getAttribute("value") || "";
+        holder.style.display = "block";
+        holder.style.width = "100%";
+        holder.style.boxSizing = "border-box";
+        holder.style.padding = cs.padding || "6px 8px";
+        holder.style.border = "none";
+        holder.style.borderRadius = cs.borderRadius || "6px";
+        holder.style.background = "transparent";
+        holder.style.color = "#000";
+        holder.style.lineHeight =
+          cs.lineHeight === "normal" ? "1.35" : cs.lineHeight;
+        holder.style.minHeight = cs.minHeight || "34px";
+        holder.style.whiteSpace = "nowrap";
+        holder.style.overflow = "hidden";
+        holder.style.textOverflow = "ellipsis";
+        inp.replaceWith(holder);
+      });
+
+    // viền đen & màu chữ đen
+    (function forceMonochrome(root) {
+      root.style.background = "#fff";
+      root.querySelectorAll("*").forEach((el) => {
+        el.style.color = "#000";
+        el.style.setProperty("-webkit-text-fill-color", "#000");
+        const cs = getComputedStyle(el);
+        if (cs.filter && cs.filter !== "none") el.style.filter = "none";
+        if (cs.mixBlendMode && cs.mixBlendMode !== "normal")
+          el.style.mixBlendMode = "normal";
+        if (cs.backdropFilter && cs.backdropFilter !== "none")
+          el.style.backdropFilter = "none";
+        if (!el.style.background || el.style.background === "transparent") {
+          if (
+            /(TABLE|THEAD|TBODY|TR|TH|TD|DIV|SECTION|ARTICLE|HEADER|FOOTER)/.test(
+              el.tagName
+            )
+          ) {
+            el.style.background = "#fff";
+          }
+        }
+      });
+      root.querySelectorAll("table, thead, tbody, tr, th, td").forEach((el) => {
+        el.style.borderColor = "#000";
+        const bw = getComputedStyle(el).borderWidth;
+        if (!bw || bw === "0px") {
+          el.style.borderWidth = "1px";
+          el.style.borderStyle = "solid";
+        }
+      });
+    })(cloneTableWrap);
+
+    // --- tạo trang chứa HEADER + BẢNG ---
+    const page = document.createElement("div");
+    page.style.cssText = `
+    position: relative; display: inline-block; background:#fff;
+    border: 1px solid #e5e7eb; border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.08);
+    padding: 20px 20px 16px;
+  `;
+
+    const header = document.createElement("div");
+    header.style.cssText = `
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    margin-bottom:12px; width:100%; text-align:center; color:#000;
+    padding-top:4px; line-height:1.25;
+  `;
+    const hTitle = document.createElement("div");
+    hTitle.textContent = titleText;
+    hTitle.style.cssText =
+      "font-size:20px; font-weight:800; letter-spacing:.3px; color:#000;";
+    header.appendChild(hTitle);
+
+    if (dateStr) {
+      const hDate = document.createElement("div");
+      hDate.textContent = "Ngày: " + String(dateStr).replace(/-/g, "/");
+      hDate.style.cssText = "margin-top:6px; font-weight:600; color:#000;";
+      header.appendChild(hDate);
+    }
+
+    page.appendChild(header);
+    page.appendChild(cloneTableWrap);
+
+    // --- chụp offscreen ---
+    const staging = document.createElement("div");
+    staging.style.position = "fixed";
+    staging.style.left = "-100000px";
+    staging.style.top = "0";
+    staging.style.background = "#fff";
+    staging.appendChild(page);
+    document.body.appendChild(staging);
+
+    try {
+      const canvas = await html2canvas(page, {
+        backgroundColor: "#fff",
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      const a = document.createElement("a");
+      a.href = canvas.toDataURL("image/png");
+      a.download = fileName;
+      a.click();
+    } catch (err) {
+      console.error("Export PNG error:", err);
+      alert("Không thể xuất ảnh.");
+    } finally {
+      staging.remove();
+    }
+  };
 
   return html;
 }

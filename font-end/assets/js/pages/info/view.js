@@ -295,7 +295,7 @@ export function renderInfoPage(key) {
   return `
   <section class="card">
     <div class="card-h">
-      <div class="title"><span class="title-lg">Danh sách thiết bị</span></div>
+      <div class="title"><span class="title-lg">List of Machines</span></div>
     </div>
     <div class="p-4">
       <div id="${ids.tip}" class="muted">Đang tải dữ liệu...</div>

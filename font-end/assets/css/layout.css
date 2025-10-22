@@ -111,7 +111,8 @@ tfoot td{background:#f8fafc;font-weight:600}
   --muted: #6b7280;    /* secondary text */
   --primary: #2563eb;  /* brand / active */
   --hover: #f3f4f6;    /* hover surface */
-  --thead-bg: #f1f5f9
+  --thead-bg: #0f78e0;
+  
 }
 
 /* Dark theme overrides */
@@ -123,7 +124,7 @@ body.dark-theme{
   --muted: #9ca3af;
   --primary: #3b82f6;
   --hover: #111827; /* giữ tối, dùng line cho hover border */
-  --thead-bg: #2d3644;
+  --thead-bg: #345e74;
 }
 
 /* ================== GLOBAL ================== */
