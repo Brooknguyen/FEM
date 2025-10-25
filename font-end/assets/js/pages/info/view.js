@@ -1,5 +1,27 @@
 // assets/js/pages/info/view.js
-// ======= CONFIG =======
+// ======================================================================
+//  TABLE OF CONTENTS / MỤC LỤC  (KHÔNG ĐỔI LOGIC)
+//  [CONFIG]           : Hằng số, base URL, chuẩn cột, chuẩn hoá ảnh
+//  [STATE]            : Trạng thái trang (sheetName, rows) + UI state filter
+//  [FILTER/SEARCH]    : Lọc bảng theo query (applyInfoSearch) + tip hiển thị
+//  [HELPERS]          : escapeHtml, isImgLike, parseImageList, freeze offsets
+//  [IMAGE-VIEWER]     : Viewer ảnh đơn giản (open/close/navigate)
+//  [TRANSFORM]        : Chuyển devices -> rows (AOA)
+//  [RENDER]           : Render bảng xem (read-only)
+//  [PAGE-HTML]        : renderInfoPage(key) trả HTML & CSS-inlined
+//  [BIND]             : bindInfoEvents(key) tải dữ liệu + gắn render
+// ======================================================================
+
+/* ======================================================================
+ * [CONFIG] — HẰNG SỐ & CẤU HÌNH CƠ BẢN
+ * ----------------------------------------------------------------------
+ * - FREEZE_HEADER_ROWS: số dòng header “đóng băng”
+ * - DEVICE_COLUMNS: fallback nếu sheet trống
+ * - API_BASE / FILE_BASE: IP cố định backend
+ * - normalizeImageCellClient(): chuẩn hoá cell chứa nhiều ảnh "a|b|c"
+ * - toAbsUrl(): chuyển URL tương đối -> tuyệt đối (dùng FILE_BASE)
+ * - 🔧 EDIT HERE: thay đổi API_BASE/FILE_BASE, DEVICE_COLUMNS nếu cần
+ * ==================================================================== */
 const FREEZE_HEADER_ROWS =
   typeof window.FREEZE_HEADER_ROWS === "number" ? window.FREEZE_HEADER_ROWS : 1;
 
@@ -20,8 +42,8 @@ const DEVICE_COLUMNS = [
 ];
 
 /* ======= API/FILE BASE (IP cố định BE) ======= */
-const API_BASE = "http://10.100.201.25:4000";
-const FILE_BASE = "http://10.100.201.25:4000"; // prefix để hiển thị ảnh
+const API_BASE = "http://10.100.201.25:4000"; // 🔧 EDIT HERE
+const FILE_BASE = "http://10.100.201.25:4000"; // 🔧 EDIT HERE (prefix hiển thị ảnh)
 
 function toAbsUrl(u) {
   const s = String(u || "").trim();
@@ -42,13 +64,72 @@ function normalizeImageCellClient(cell) {
     .join("|");
 }
 
-// ======= STATE (tối giản) =======
+/* ======================================================================
+ * [STATE] — TRẠNG THÁI DỮ LIỆU & UI FILTER
+ * ----------------------------------------------------------------------
+ * - STATE: tên sheet & mảng rows (AOA)
+ * - UI: nắm ref phần preview, tip, và query gần nhất
+ * - countVisibleRows(): đếm số tr hiện tại không hidden
+ * - updateTipAfterFilter(): cập nhật tip khi lọc
+ * ==================================================================== */
 const STATE = {
   sheetName: "",
   rows: [], // AOA
 };
 
-// ======= HELPERS (tối giản) =======
+// ======= UI STATE cho search + helpers =======
+const UI = { preview: null, tipEl: null, lastQuery: "", previewEl: null };
+
+function countVisibleRows(tb) {
+  if (!tb) return 0;
+  let n = 0;
+  for (const tr of tb.rows) if (!tr.hidden) n++;
+  return n;
+}
+
+function updateTipAfterFilter() {
+  if (!UI.tipEl) return;
+  const total = Math.max(0, (STATE.rows.length - FREEZE_HEADER_ROWS) | 0);
+  const tb = UI.previewEl?.querySelector("tbody");
+  const vis = countVisibleRows(tb);
+  const base = `Sheet: ${STATE.sheetName} - ${total} data rows + ${FREEZE_HEADER_ROWS} header`;
+  UI.tipEl.textContent = UI.lastQuery?.trim()
+    ? `${base} | The filtered results: ${vis}/${total}`
+    : base;
+}
+
+/* ======================================================================
+ * [FILTER/SEARCH] — Lọc bảng theo query
+ * ----------------------------------------------------------------------
+ * - applyInfoSearch(query): set UI.lastQuery & set tr.hidden theo includes
+ * - Điểm debug nhanh: kiểm tra q, textContent toLowerCase(), tbody tồn tại
+ * - API giữ nguyên: export function applyInfoSearch(query)
+ * ==================================================================== */
+export function applyInfoSearch(query) {
+  UI.lastQuery = String(query || "");
+  const q = UI.lastQuery.trim().toLowerCase();
+
+  const table = UI.previewEl?.querySelector("table");
+  const tb = table?.tBodies?.[0];
+  if (!tb) return;
+
+  for (const tr of tb.rows) {
+    const text = tr.textContent?.toLowerCase() ?? "";
+    tr.hidden = q && !text.includes(q);
+  }
+
+  updateTipAfterFilter();
+}
+// ========= END FILTER STATE cho search bar ===========
+
+/* ======================================================================
+ * [HELPERS] — Hàm nhỏ dùng chung
+ * ----------------------------------------------------------------------
+ * - escapeHtml(): chống XSS ở nội dung cells
+ * - isImgLike(): xác định chuỗi “giống url ảnh”
+ * - parseImageList(): tách val thành list ảnh theo '|' hoặc đơn lẻ
+ * - adjustFreezeOffsets(): set CSS var --hdr1 theo chiều cao head
+ * ==================================================================== */
 function escapeHtml(s) {
   return String(s ?? "")
     .replace(/&/g, "&amp;")
@@ -84,7 +165,14 @@ function adjustFreezeOffsets(previewEl) {
   previewEl.style.setProperty("--hdr1", h1 + "px");
 }
 
-/* ========= IMAGE VIEWER (tối giản) ========= */
+/* ======================================================================
+ * [IMAGE-VIEWER] — Viewer ảnh đơn giản
+ * ----------------------------------------------------------------------
+ * - ensureImageViewer(): dựng modal + events (1 lần)
+ * - openImageViewer(list, startIdx): mở viewer với danh sách ảnh
+ * - closeImageViewer(), navigateImageViewer(), renderImageViewerFrame()
+ * - 🔧 chỉnh style viewer tại ensureImageViewer()
+ * ==================================================================== */
 function ensureImageViewer() {
   if (document.getElementById("imgViewerModal")) return;
 
@@ -195,7 +283,11 @@ function openImageViewer(list, startIdx = 0) {
   }
 }
 
-/* ======= CHUYỂN devices -> rows (AOA) ======= */
+/* ======================================================================
+ * [TRANSFORM] — devices -> rows (AOA)
+ * ----------------------------------------------------------------------
+ * - devicesToRows(): giữ nguyên mapping theo DEVICE_COLUMNS
+ * ==================================================================== */
 function devicesToRows(devices = []) {
   const rows = [[...DEVICE_COLUMNS]];
   for (const d of devices) {
@@ -217,7 +309,13 @@ function devicesToRows(devices = []) {
   return rows;
 }
 
-/* ======= RENDER TABLE (READ-ONLY) ======= */
+/* ======================================================================
+ * [RENDER] — Render bảng xem (read-only)
+ * ----------------------------------------------------------------------
+ * - renderTable(container): dựng <table>, bind thumbnail -> viewer
+ * - adjustFreezeOffsets(): cập nhật --hdr1 sau khi render
+ * - 🔧 style thumb-one tại inline style dưới
+ * ==================================================================== */
 function renderTable(container) {
   const rows = STATE.rows;
   const R = rows.length;
@@ -288,7 +386,12 @@ function renderTable(container) {
   });
 }
 
-/* ======= PAGE RENDER (ONLY TABLE) ======= */
+/* ======================================================================
+ * [PAGE-HTML] — renderInfoPage(key)
+ * ----------------------------------------------------------------------
+ * - Trả về HTML khối card + CSS nội tuyến cho preview
+ * - 🔧 EDIT HERE: chỉnh max-height bảng, style header sticky
+ * ==================================================================== */
 export function renderInfoPage(key) {
   const ids = { tip: `${key}-tip`, prev: `${key}-preview` };
 
@@ -313,10 +416,22 @@ export function renderInfoPage(key) {
   </style>`;
 }
 
-/* ======= BIND (ONLY LOAD DATA & RENDER) ======= */
+/* ======================================================================
+ * [BIND] — bindInfoEvents(key): tải dữ liệu + render
+ * ----------------------------------------------------------------------
+ * - Lấy sheet từ query ?sheet=THIET_BI (mặc định)
+ * - Gọi API /api/info/latest?name=...
+ * - Backend trả { devices: [...] } → chuyển sang AOA rows
+ * - Chuẩn hoá cột ảnh trước khi render
+ * - Sau render: nếu có UI.lastQuery thì apply lại filter + cập nhật tip
+ * - 🔧 EDIT HERE: đổi endpoint hoặc map trường d->rows
+ * ==================================================================== */
 export function bindInfoEvents(key) {
   const tip = document.getElementById(`${key}-tip`);
   const preview = document.getElementById(`${key}-preview`);
+
+  UI.previewEl = preview;
+  UI.tipEl = tip;
 
   (async function loadInitial() {
     const params = new URLSearchParams(location.search);
@@ -354,12 +469,13 @@ export function bindInfoEvents(key) {
         STATE.rows[r][0] = normalizeImageCellClient(STATE.rows[r][0]);
       }
 
-      if (tip)
-        tip.textContent = `Sheet: ${STATE.sheetName} — ${
-          STATE.rows.length - FREEZE_HEADER_ROWS
-        } hàng dữ liệu + ${FREEZE_HEADER_ROWS} header`;
+      if (preview) {
+        renderTable(preview);
+        // ⚠️ Giữ nguyên ý tưởng gọi lại filter nếu có lastQuery
+        // LƯU Ý: tên hàm là applyInfoSearch (viết hoa chữ S)
+        if (UI.lastQuery) applyInfoSearch(UI.lastQuery); // KHÔNG đổi logic
+        updateTipAfterFilter();
+      }
     }
-
-    if (preview) renderTable(preview);
   })();
 }

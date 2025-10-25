@@ -1,0 +1,3 @@
+﻿name,type,model,power,voltage,capa,gas,brand,year,location,note,image
+AHU1,AHU,16622,1100HP,380V,3600m3,R22,Kyoung Won,1922,Tầng mái,Không,http://10.100.201.25:4000/uploads/THIET_BI/1760946573862-img-1.webp|http://10.100.201.25:4000/uploads/THIET_BI/1760946574126-img-2.webp|http://10.100.201.25:4000/uploads/THIET_BI/1760946574335-img-3.webp
+AHU2,AHU,16622,1500HP,380V,3900m3,R22,Kyoung Won,1922,Tầng mái,Không,http://10.100.201.25:4000/uploads/THIET_BI/1760947306487-img-1.webp|http://10.100.201.25:4000/uploads/THIET_BI/1760947306681-img-2.webp

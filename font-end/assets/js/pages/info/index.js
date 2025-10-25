@@ -1,11 +1,12 @@
 // assets/js/pages/info/index.js
-import { renderInfoPage, bindInfoEvents } from "./view.js";
+import { renderInfoPage, bindInfoEvents, applyInfoSearch } from "./view.js";
+import { onGlobalSearch } from "../../search.js";
 
 export function renderInfoRoute(path) {
   // chuẩn hóa path: bỏ # hoặc / đầu, cắt phần ?query / #hash
   const cleaned = String(path || "")
     .replace(/^[#\/]+/, "")
-    .split(/[?#]/)[0];          // ✅ sửa: [?#]/)[0] thay vì [?#]/[0]
+    .split(/[?#]/)[0]; // ✅ sửa: [?#]/)[0] thay vì [?#]/[0]
 
   const segs = cleaned.split("/").filter(Boolean);
 
@@ -18,7 +19,9 @@ export function renderInfoRoute(path) {
   }
 
   // nếu có encode (ví dụ "AHU%201") thì decode
-  try { active = decodeURIComponent(active); } catch {}
+  try {
+    active = decodeURIComponent(active);
+  } catch {}
 
   // render HTML + bind sự kiện load dữ liệu
   const html = renderInfoPage(active);
@@ -28,4 +31,17 @@ export function renderInfoRoute(path) {
 
   // ✅ Quan trọng: trả về HTML để router chèn vào DOM
   return html;
+}
+
+export function setupInfoEvents({ signal } = {}) {
+  onGlobalSearch(
+    (q) => {
+      applyInfoSearch(q);
+    },
+    {
+      immediate: true,
+      filter: () => location.hash.startsWith("#/info/"),
+      signal,
+    }
+  );
 }

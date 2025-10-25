@@ -111,7 +111,7 @@ tfoot td{background:#f8fafc;font-weight:600}
   --muted: #6b7280;    /* secondary text */
   --primary: #2563eb;  /* brand / active */
   --hover: #f3f4f6;    /* hover surface */
-  --thead-bg: #0f78e0;
+  --thead-bg: #7ba0f0;
   
 }
 
@@ -124,7 +124,7 @@ body.dark-theme{
   --muted: #9ca3af;
   --primary: #3b82f6;
   --hover: #111827; /* giữ tối, dùng line cho hover border */
-  --thead-bg: #345e74;
+  --thead-bg: #A78BFA;
 }
 
 /* ================== GLOBAL ================== */
@@ -380,7 +380,26 @@ body.dark-theme .table-wrap::-webkit-scrollbar-thumb:hover,
 body.dark-theme #main::-webkit-scrollbar-thumb:hover {
   background-color: var(--muted);
 }
+/* ================= WEATHER FORECAST ====================== */
+.weather-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  background: var(-card,#fff);
+  color: var(--fg,#111);
+  border: 1px solid var(--line,#e5e7eb);
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  font-size: 13px; 
+  line-height: 1;
+  white-space: nowrap;
+}
 
+.weather-chip .w-emoji{ font-size:16px }
+.weather-chip .w-place{ font-weight:600; margin-right:4px }
+.weather-chip .w-temp{ font-weight:700; margin-right:6px }
+.weather-chip .w-dot{ opacity: .35}
 
 
 

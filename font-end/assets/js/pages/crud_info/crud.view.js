@@ -1,11 +1,32 @@
 // assets/js/pages/info/view.js
-// ======= CONFIG (fallback nếu project không truyền) =======
+// ======================================================================
+//  TABLE OF CONTENTS / MỤC LỤC  (KHÔNG ĐỔI LOGIC)
+//  [CONFIG]           : Hằng số, base URL, chuẩn cột, chuẩn hoá ảnh
+//  [MAP]              : Chuyển devices <-> rows (AOA)
+//  [STATE]            : Trạng thái trang + flags UI
+//  [HELPERS]          : escapeHtml, isImgLike, parseImageList, XLSX decode...
+//  [MIGRATION]        : ensureCapaColumn (ép cột Capa đứng trước Gas)
+//  [FORM]             : buildForm + form I/O + multiple-images helpers
+//  [IMAGE-VIEWER]     : Modal xem ảnh + điều hướng
+//  [RENDER]           : renderTable (bảng + hành động per-row)
+//  [PAGE-HTML]        : renderCrudInfoPage(key) — HTML + CSS inlined
+//  [BIND]             : bindCrudInfoEvents(key) — import/export/save/add/... + load initial
+// ======================================================================
+
+/* ======================================================================
+ * [CONFIG] — Hằng số, BASE URL, chuẩn cột, chuẩn hoá ảnh
+ * ----------------------------------------------------------------------
+ * - 🔧 EDIT HERE:
+ *   - API_BASE / FILE_BASE nếu thay IP/PORT
+ *   - DEVICE_COLUMNS nếu thêm/bớt cột
+ * - 🐞 DEBUG HERE:
+ *   - Ảnh không hiển thị sau khi đổi domain → xem FILE_BASE + toAbsUrl()
+ * ==================================================================== */
 const FREEZE_HEADER_ROWS =
   typeof window.FREEZE_HEADER_ROWS === "number" ? window.FREEZE_HEADER_ROWS : 1;
 const FREEZE_FIRST_COL =
   typeof window.FREEZE_FIRST_COL === "boolean" ? window.FREEZE_FIRST_COL : true;
 
-// ======= CỘT CHUẨN THIẾT BỊ =======
 const DEVICE_COLUMNS = [
   "Hình ảnh",
   "Tên thiết bị",
@@ -21,17 +42,17 @@ const DEVICE_COLUMNS = [
   "Ghi chú",
 ];
 
-/* ======= API/FILE BASE (IP cố định BE) ======= */
-const API_BASE = "http://10.100.201.25:4000";
-const FILE_BASE = "http://10.100.201.25:4000"; // prefix để hiển thị ảnh
+const API_BASE = "http://10.100.201.25:4000"; // 🔧 EDIT HERE
+const FILE_BASE = "http://10.100.201.25:4000"; // 🔧 EDIT HERE (prefix ảnh)
 
+// Chuyển URL tương đối -> tuyệt đối: data:, http(s), /uploads/...
 function toAbsUrl(u) {
   const s = String(u || "").trim();
   if (!s) return "";
-  if (/^data:/i.test(s)) return s; // dataURL -> giữ nguyên
-  if (/^https?:\/\//i.test(s)) return s; // http/https -> giữ nguyên
-  if (s.startsWith("/")) return FILE_BASE + s; // /uploads/... -> http://IP:PORT/uploads/...
-  return s; // tên file trần hoặc chuỗi khác
+  if (/^data:/i.test(s)) return s;
+  if (/^https?:\/\//i.test(s)) return s;
+  if (s.startsWith("/")) return FILE_BASE + s;
+  return s;
 }
 
 // Chuẩn hoá 1 ô chứa nhiều ảnh "url1|url2|..." thành URL tuyệt đối
@@ -43,24 +64,17 @@ function normalizeImageCellClient(cell) {
     .map(toAbsUrl)
     .join("|");
 }
-/* ======= MAP devices <-> rows (AOA) ======= */
+
+/* ======================================================================
+ * [MAP] — devices <-> rows (AOA)
+ * ----------------------------------------------------------------------
+ * - 🔧 EDIT HERE:
+ *   - Nếu đổi thứ tự/đặt thêm cột → sửa cả 2 hàm dưới
+ * - 🐞 DEBUG HERE:
+ *   - Lưu/Export lệch cột → kiểm tra mapping
+ * ==================================================================== */
 function devicesToRows(devices = []) {
-  const rows = [
-    [
-      "Hình ảnh",
-      "Tên thiết bị",
-      "Phân loại thiết bị",
-      "Model",
-      "Công suất",
-      "Điện áp",
-      "Capa",
-      "Gas",
-      "Hãng",
-      "Năm chế tạo",
-      "Vị trí hiện tại",
-      "Ghi chú",
-    ],
-  ];
+  const rows = [DEVICE_COLUMNS.slice()];
   for (const d of devices || []) {
     rows.push([
       d?.image ?? "",
@@ -108,7 +122,14 @@ function rowsToDevices(rows = []) {
   return out;
 }
 
-// ======= STATE =======
+/* ======================================================================
+ * [STATE] — Trạng thái dữ liệu & UI flags
+ * ----------------------------------------------------------------------
+ * - 🔧 EDIT HERE:
+ *   - Thêm flag nếu cần (ví dụ: allowInlineEdit)
+ * - 🐞 DEBUG HERE:
+ *   - Nút Save không bật/tắt → xem setDirty() + refreshToolbar()
+ * ==================================================================== */
 const STATE = {
   sheetName: "",
   rows: [], // AOA nháp
@@ -119,7 +140,15 @@ const STATE = {
   selectedBodyIdxs: new Set(), // index body (0-based)
 };
 
-// ======= HELPERS =======
+/* ======================================================================
+ * [HELPERS] — escapeHtml, isImgLike, parseImageList, XLSX decode...
+ * ----------------------------------------------------------------------
+ * - 🔧 EDIT HERE:
+ *   - sheetToMatrixAndMerges: đổi cell.w vs cell.v nếu cần giữ định dạng
+ * - 🐞 DEBUG HERE:
+ *   - Header sticky đè nội dung → adjustFreezeOffsets()
+ *   - Import mất merge → sheetToMatrixAndMerges()
+ * ==================================================================== */
 function escapeHtml(s) {
   return String(s ?? "")
     .replace(/&/g, "&amp;")
@@ -163,6 +192,7 @@ function sheetToMatrixAndMerges(sheet) {
     for (let c = range.s.c; c <= range.e.c; c++) {
       const addr = XLSX.utils.encode_cell({ r, c });
       const cell = sheet[addr];
+      // 🔧 EDIT HERE: muốn giữ định dạng hiển thị → ưu tiên cell.w
       matrix[r - range.s.r][c - range.s.c] = (cell && (cell.w ?? cell.v)) ?? "";
     }
   }
@@ -170,6 +200,7 @@ function sheetToMatrixAndMerges(sheet) {
     s: { r: m.s.r - range.s.r, c: m.s.c - range.s.c },
     e: { r: m.e.r - range.s.r, c: m.e.c - range.s.c },
   }));
+  // cắt đuôi các hàng trống
   while (matrix.length && matrix.at(-1).every((v) => v === "" || v == null))
     matrix.pop();
   return { matrix, merges };
@@ -203,7 +234,12 @@ function refreshToolbar() {
   if (btnSave) btnSave.disabled = !STATE.dirty || !hasRows;
 }
 
-/* ======= MIGRATE: đảm bảo có cột Capa trước Gas ======= */
+/* ======================================================================
+ * [MIGRATION] — đảm bảo có cột Capa trước Gas
+ * ----------------------------------------------------------------------
+ * - 🔧 EDIT HERE: đổi vị trí/đổi tên cột cần ép
+ * - 🐞 DEBUG HERE: import file cũ thiếu Capa → layout lệch
+ * ==================================================================== */
 function ensureCapaColumn() {
   if (!STATE.rows.length) return;
   const hdrIdx = Math.max(
@@ -223,9 +259,17 @@ function ensureCapaColumn() {
   }
 }
 
-/* ======= FORM ======= */
+/* ======================================================================
+ * [FORM] — dựng form + I/O + quản lý nhiều ảnh
+ * ----------------------------------------------------------------------
+ * - 🔧 EDIT HERE:
+ *   - text input validation/placeholder
+ *   - thay UI ảnh (kích thước thumb, hạn chế số ảnh)
+ * - 🐞 DEBUG HERE:
+ *   - Thêm ảnh nhưng hidden input không cập nhật → setImageList()
+ * ==================================================================== */
 function buildForm(formEl, key) {
-  if (!formEl) return; // Phòng null
+  if (!formEl) return;
   formEl.innerHTML = "";
 
   const labels = lastHeaderRow(STATE.rows).length
@@ -237,7 +281,7 @@ function buildForm(formEl, key) {
     const isImg = String(label).trim().toLowerCase() === "hình ảnh";
 
     if (isImg) {
-      // Chèn UI chọn ảnh
+      // UI chọn ảnh
       formEl.insertAdjacentHTML(
         "beforeend",
         `
@@ -258,7 +302,7 @@ function buildForm(formEl, key) {
         `
       );
 
-      // ❗ TÌM BÊN TRONG formEl, KHÔNG dùng document.getElementById
+      // tìm trong formEl (tránh đụng id bên ngoài)
       const dz = formEl.querySelector(`[id="${id}-dz"]`);
       const file = formEl.querySelector(`[id="${id}-file"]`);
 
@@ -366,7 +410,7 @@ function loadRowToForm(key, bodyIdx, rowOverride) {
   });
 }
 
-/* ======= Helpers cho ảnh nhiều ======= */
+/* Helpers nhiều ảnh (ô cột 0) */
 function getImageList(key, colIdx) {
   const s = document.getElementById(`${key}-f-${colIdx}`)?.value || "";
   return s ? s.split("|").filter(Boolean) : [];
@@ -403,8 +447,13 @@ function renderImagePreviews(key, colIdx, list) {
     });
   });
 }
-/* ========= IMAGE VIEWER (iframe modal) ========= */
-/* Tạo modal 1 lần nếu chưa có */
+
+/* ======================================================================
+ * [IMAGE-VIEWER] — Modal xem ảnh đơn giản (iframe)
+ * ----------------------------------------------------------------------
+ * - 🔧 EDIT HERE: style/zoom/rotate trong ensureImageViewer()
+ * - 🐞 DEBUG HERE: bấm thumbnail không mở → kiểm tra data-images & parseImageList()
+ * ==================================================================== */
 function ensureImageViewer() {
   if (document.getElementById("imgViewerModal")) return;
 
@@ -428,7 +477,7 @@ function ensureImageViewer() {
         <button id="imgCloseBtn" class="btn" style="padding:6px 10px; border:none">✖</button>
       </div>
 
-      <!-- Khu vực hiển thị ảnh + mũi tên overlay -->
+      <!-- Stage -->
       <div id="imgStage" style="position:relative; flex:1; background:#000;">
         <iframe id="imgFrame" style="position:absolute; inset:0; width:100%; height:100%; border:0; background:#000" src="about:blank"></iframe>
 
@@ -451,21 +500,15 @@ function ensureImageViewer() {
 
   document.body.appendChild(wrap);
 
-  // Đóng khi bấm nền tối
   wrap.addEventListener("click", (e) => {
     if (e.target === wrap) closeImageViewer();
   });
-
-  // Nút close
   document.getElementById("imgCloseBtn").onclick = closeImageViewer;
-
-  // Nút mũi tên overlay
   document.getElementById("imgArrowLeft").onclick = () =>
     navigateImageViewer(-1);
   document.getElementById("imgArrowRight").onclick = () =>
     navigateImageViewer(1);
 
-  // Phím tắt
   window.addEventListener("keydown", (e) => {
     if (wrap.style.display !== "grid") return;
     if (e.key === "Escape") closeImageViewer();
@@ -481,7 +524,6 @@ function closeImageViewer() {
   IMG_VIEWER_STATE.list = [];
   IMG_VIEWER_STATE.idx = 0;
 }
-
 function navigateImageViewer(step) {
   if (!IMG_VIEWER_STATE.list.length) return;
   IMG_VIEWER_STATE.idx =
@@ -489,13 +531,11 @@ function navigateImageViewer(step) {
     IMG_VIEWER_STATE.list.length;
   renderImageViewerFrame();
 }
-
 function renderImageViewerFrame() {
   const iframe = document.getElementById("imgFrame");
   const ctr = document.getElementById("imgCounter");
   const url = IMG_VIEWER_STATE.list[IMG_VIEWER_STATE.idx];
 
-  // Tạo HTML đơn giản hiển thị ảnh full trong iframe
   const html = `
     <!doctype html>
     <meta charset="utf-8">
@@ -507,7 +547,6 @@ function renderImageViewerFrame() {
     </style>
     <div class="ph"><img src="${url}" alt=""></div>
   `;
-  // Viết vào iframe
   const doc = iframe.contentDocument || iframe.contentWindow?.document;
   if (doc) {
     doc.open();
@@ -518,15 +557,7 @@ function renderImageViewerFrame() {
     ctr.textContent = `${IMG_VIEWER_STATE.idx + 1} / ${
       IMG_VIEWER_STATE.list.length
     }`;
-
-  // Gán nút prev/next (sau khi modal đã có)
-  const prevBtn = document.getElementById("imgPrevBtn");
-  const nextBtn = document.getElementById("imgNextBtn");
-  if (prevBtn) prevBtn.onclick = () => navigateImageViewer(-1);
-  if (nextBtn) nextBtn.onclick = () => navigateImageViewer(1);
 }
-
-/* Mở viewer với danh sách ảnh và index bắt đầu */
 function openImageViewer(list, startIdx = 0) {
   ensureImageViewer();
   if (!Array.isArray(list) || !list.length) return;
@@ -539,7 +570,15 @@ function openImageViewer(list, startIdx = 0) {
   }
 }
 
-// ======= RENDER TABLE =======
+/* ======================================================================
+ * [RENDER] — Bảng + hành động từng hàng
+ * ----------------------------------------------------------------------
+ * - 🔧 EDIT HERE:
+ *   - Cho inline edit → đổi attribute contenteditable="true"
+ * - 🐞 DEBUG HERE:
+ *   - Hiện tại selector blur lắng nghe td[contenteditable="true"], nhưng TD set "false"
+ *     → nếu cần inline edit: đổi `editable` bên dưới thành true.
+ * ==================================================================== */
 function renderTable(container) {
   const rows = STATE.rows;
   const R = rows.length;
@@ -571,10 +610,10 @@ function renderTable(container) {
 
     for (let c = 0; c < C; c++) {
       const vRaw = body[i][c] ?? "";
-      const editable = `contenteditable="false" spellcheck="false"`;
+      const editable = `contenteditable="false" spellcheck="false"`; // 🔧 turn to "true" if inline-edit needed
 
       if (c === 0) {
-        // Cột Hình ảnh: chỉ hiển thị 1 thumbnail (tấm đầu), click để mở viewer
+        // Thumbnail ảnh đầu; click mở viewer
         const imgs = parseImageList(vRaw).map(toAbsUrl);
         if (imgs.length) {
           html += `<td ${editable} data-body="${i}" data-c="${c}">
@@ -590,7 +629,7 @@ function renderTable(container) {
           )}</td>`;
         }
       } else {
-        // Các cột khác: nếu là ảnh đơn -> preview
+        // Ảnh đơn ở các cột khác: hiển thị URL + preview
         const v = toAbsUrl(vRaw);
         if (isImgLike(v)) {
           const text = escapeHtml(v);
@@ -617,7 +656,7 @@ function renderTable(container) {
   container.innerHTML = html;
   adjustFreezeOffsets(container);
 
-  // Viewer cho thumbnail cột Hình ảnh
+  // Viewer cho thumbnail ảnh
   ensureImageViewer();
   container.querySelectorAll(".thumb-one").forEach((imgEl) => {
     imgEl.addEventListener("click", (e) => {
@@ -643,7 +682,7 @@ function renderTable(container) {
     });
   });
 
-  // Sửa inline
+  // Inline edit (chỉ chạy nếu bạn bật contenteditable="true")
   container
     .querySelectorAll('tbody td[contenteditable="true"]')
     .forEach((td) => {
@@ -652,16 +691,11 @@ function renderTable(container) {
         const c = +td.dataset.c;
         const r = FREEZE_HEADER_ROWS + bi;
 
-        // Mặc định lấy text
         let val = td.textContent.trim();
-
-        // Nếu là ô đã render text+preview ảnh đơn (cột ≠ 0), ưu tiên lấy từ div text
         const txtDiv = td.querySelector('[data-celltext="1"]');
         if (txtDiv) val = txtDiv.textContent.trim();
 
-        // Cột 0 (Hình ảnh): không ghi đè chuỗi url1|url2 khi blur
-        if (c === 0) val = STATE.rows[r][c];
-
+        if (c === 0) val = STATE.rows[r][c]; // không ghi đè chuỗi url1|url2 khi blur ở cột ảnh
         STATE.rows[r][c] = val;
         setDirty(true);
       });
@@ -681,7 +715,7 @@ function renderTable(container) {
       });
     });
 
-  // Sửa/Xóa theo hàng
+  // Edit/Delete theo hàng
   container.querySelectorAll(".row-edit").forEach((btn) => {
     btn.addEventListener("click", () => {
       const bi = +btn.dataset.bi;
@@ -712,7 +746,13 @@ function renderTable(container) {
   });
 }
 
-// ======= PAGE RENDER =======
+/* ======================================================================
+ * [PAGE-HTML] — renderCrudInfoPage(key)
+ * ----------------------------------------------------------------------
+ * - Trả về HTML khối card + CSS nội tuyến cho preview + form + toolbar
+ * - 🔧 EDIT HERE:
+ *   - Chỉnh max-height bảng, style header sticky, thêm nút ở toolbar
+ * ==================================================================== */
 export function renderCrudInfoPage(key) {
   const cfg =
     (window.CRUD_INFO_RESOURCES && window.CRUD_INFO_RESOURCES[key]) || null;
@@ -830,7 +870,14 @@ export function renderCrudInfoPage(key) {
 // để dùng trong renderTable
 let currentBindKey = "";
 
-// ======= BIND =======
+/* ======================================================================
+ * [BIND] — bindCrudInfoEvents(key)
+ * ----------------------------------------------------------------------
+ * - Import (.xlsx), Export, Save(put), Add, Edit/Delete (per-row + toolbar)
+ * - Load initial từ API (ưu tiên doc.devices/doc.merged; fallback rows/merges)
+ * - 🔧 EDIT HERE: endpoint, auth header, validate trước khi Save
+ * - 🐞 DEBUG HERE: Import lần 2 không chạy → nhớ reset file input value
+ * ==================================================================== */
 export function bindCrudInfoEvents(key) {
   currentBindKey = key;
 
@@ -889,7 +936,7 @@ export function bindCrudInfoEvents(key) {
       console.error(e);
       alert("Không đọc được file Excel");
     } finally {
-      ev.target.value = "";
+      ev.target.value = ""; // quan trọng để import lại được lần sau
     }
   };
 
@@ -936,7 +983,7 @@ export function bindCrudInfoEvents(key) {
   // ADD
   btnAdd.onclick = () => {
     const newRow = readFormRow(key);
-    if (STATE.rows.length === 0) STATE.rows = [[...DEVICE_COLUMNS]];
+    if (STATE.rows.length === 0) STATE.rows = [DEVICE_COLUMNS.slice()];
     ensureCapaColumn();
     STATE.rows.push(newRow);
     setDirty(true);
@@ -945,7 +992,7 @@ export function bindCrudInfoEvents(key) {
     clearForm(key);
   };
 
-  // Toolbar EDIT/DEL (tùy có render hay không)
+  // Toolbar EDIT/DEL (nếu có render)
   if (btnEdit) {
     btnEdit.onclick = () => {
       if (STATE.selectedBodyIdxs.size === 0) return;
@@ -991,7 +1038,7 @@ export function bindCrudInfoEvents(key) {
       if (tryAny.ok) res = tryAny;
       else {
         STATE.sheetName = targetSheet;
-        STATE.rows = [[...DEVICE_COLUMNS]];
+        STATE.rows = [DEVICE_COLUMNS.slice()];
         STATE.merges = [];
         ensureCapaColumn();
         STATE.originalRows = JSON.parse(JSON.stringify(STATE.rows));
@@ -1008,17 +1055,15 @@ export function bindCrudInfoEvents(key) {
       const err = await res.json().catch(() => ({}));
       console.error(err);
       STATE.sheetName = targetSheet;
-      STATE.rows = [[...DEVICE_COLUMNS]];
+      STATE.rows = [DEVICE_COLUMNS.slice()];
       STATE.merges = [];
       tip.textContent = "Không tải được dữ liệu. Đã tạo sheet trống.";
     } else {
       const doc = await res.json();
       STATE.sheetName = doc.sheetName || targetSheet;
 
-      // ===== ƯU TIÊN BE MỚI: devices/merged =====
+      // ƯU TIÊN BE MỚI: devices/merged
       if (Array.isArray(doc.devices)) {
-        // Cần có 2 hàm trợ giúp đã thêm trước đó:
-        // devicesToRows(devices) và normalizeImageCellClient(...)
         let rows = devicesToRows(doc.devices);
 
         // Chuẩn hoá URL ảnh ở cột 0
@@ -1031,11 +1076,11 @@ export function bindCrudInfoEvents(key) {
         STATE.rows = rows;
         STATE.merges = Array.isArray(doc.merged) ? doc.merged : [];
       } else {
-        // ===== Fallback BE cũ: rows/merges =====
+        // Fallback BE cũ: rows/merges
         STATE.rows =
           Array.isArray(doc.rows) && doc.rows.length
             ? doc.rows
-            : [[...DEVICE_COLUMNS]];
+            : [DEVICE_COLUMNS.slice()];
         STATE.merges = Array.isArray(doc.merges) ? doc.merges : [];
 
         // Chuẩn hoá URL ảnh ở cột 0

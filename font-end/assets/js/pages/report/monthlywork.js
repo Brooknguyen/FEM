@@ -1,39 +1,62 @@
 // monthlywork.js
-const API_BASE = "http://10.100.201.25:4000/api/device-inspection";
+// ======================================================================
+//  TABLE OF CONTENTS / MỤC LỤC  (KHÔNG ĐỔI LOGIC, CHỈ SẮP XẾP LẠI)
+//  [CONFIG]            : API config
+//  [TEMPLATE]          : HTML bảng + Modal (string template)
+//  [BOOTSTRAP]         : renderMonthlyWorkReport(date) -> gắn HTML + init events
+//  [SETUP/EVENTS]      : setupInspectionEvents(date) (fetch, modal, thêm/sửa/xoá)
+//  [ROW HELPERS]       : đọc/ghi form <-> hàng bảng, header/cột Thao tác, “No data”
+//  [FETCH]             : fetchJson, fetchInspection
+//  [SUBMIT]            : submitInspectionReport(date)
+//  [PUBLIC API]        : window.__setInspectionEditMode(enabled)
+// ======================================================================
 
-export async function renderMonthlyWorkReport(date) {
-  const html = `
+/* ======================================================================
+ * [CONFIG] — API cấu hình
+ * ----------------------------------------------------------------------
+ * - 🔧 EDIT HERE khi đổi IP/route BE
+ * ==================================================================== */
+const API_BASE = "http://10.100.201.25:4000/api/device-inspection"; // 🔧 EDIT HERE
+
+/* ======================================================================
+ * [TEMPLATE] — HTML table + modal (giữ nguyên id/tên cũ)
+ * ----------------------------------------------------------------------
+ * - buildReportHTML(): trả ra full HTML của bảng + modal
+ * - KHÔNG đổi id: #inspection-tbody, #inspect-modal, #ins-save, ...
+ * ==================================================================== */
+function buildReportHTML() {
+  return `
     <table class="table-report" style="width:100%; border-collapse:collapse;">
-        <style>
-          .table-report {
-            border-collapse: collapse;
-            width: max-content;
-            min-width: 100%;
-            text-align: center;
-            line-height: 1.35;
-            min-height: 34px;
-            border: 1px solid var(--fg);
-          }
-          .table-report td, .table-report th {
-            vertical-align: middle;
-            border: 1px solid var(--fg);
-            padding: 8px;
-          }
-          .table-report .cell-input {
-            display: block;
-            width: 100%;
-            min-width: 0;
-            box-sizing: border-box;
-            padding: 6px 8px;
-            border: none;
-            border-radius: 6px;
-            background: transparent;
-            color: var(--fg);
-            outline: none;
-          }
-          .table-report tr:last-child td { border-bottom: none; }
-          .table-report td:last-child   { border-right: none; }
-        </style>
+      <style>
+        .table-report {
+          border-collapse: collapse;
+          width: max-content;
+          min-width: 100%;
+          text-align: center;
+          line-height: 1.35;
+          min-height: 34px;
+          border: 1px solid var(--fg);
+        }
+        .table-report td, .table-report th {
+          vertical-align: middle;
+          border: 1px solid var(--fg);
+          padding: 8px;
+        }
+        .table-report .cell-input {
+          display: block;
+          width: 100%;
+          min-width: 0;
+          box-sizing: border-box;
+          padding: 6px 8px;
+          border: none;
+          border-radius: 6px;
+          background: transparent;
+          color: var(--fg);
+          outline: none;
+        }
+        .table-report tr:last-child td { border-bottom: none; }
+        .table-report td:last-child   { border-right: none; }
+      </style>
       <thead>
         <tr>
           <th>STT</th>
@@ -70,16 +93,31 @@ export async function renderMonthlyWorkReport(date) {
         <textarea id="ins-issue" style="width:100%; height:90px; padding:8px;" placeholder="Không phát hiện bất thường / Mô tả lỗi..."></textarea>
 
         <div style="text-align:right; margin-top:14px;">
-          <button id="ins-save" style="padding:6px 12px; background:#16a34a; color:#fff; border:none; border-radius:4px;">Lưu</button>
+          <button id="ins-save"   style="padding:6px 12px; background:#16a34a; color:#fff; border:none; border-radius:4px;">Lưu</button>
           <button id="ins-cancel" style="padding:6px 12px; margin-left:8px; border:none; background:#ef4444; color:#fff; border-radius:4px;">Thoát</button>
         </div>
       </div>
     </div>
   `;
-  setTimeout(() => setupInspectionEvents(date), 0);
+}
+
+/* ======================================================================
+ * [BOOTSTRAP] — Render + khởi tạo
+ * ----------------------------------------------------------------------
+ * - API giữ nguyên: export async function renderMonthlyWorkReport(date)
+ * - Thêm delay ngắn để DOM sẵn sàng trước khi bind
+ * ==================================================================== */
+export async function renderMonthlyWorkReport(date) {
+  const html = buildReportHTML();
+  setTimeout(() => setupInspectionEvents(date), 0); // giữ nguyên hành vi
   return html;
 }
 
+/* ======================================================================
+ * [SETUP/EVENTS] — Fetch dữ liệu, Modal, Thêm/Sửa/Xoá hàng
+ * ----------------------------------------------------------------------
+ * - Không đổi id hoặc text các nút/ô input
+ * ==================================================================== */
 function setupInspectionEvents(date) {
   const tbody = document.getElementById("inspection-tbody");
   const addBtn = document.getElementById("add-task-btn"); // dùng nút chung của SPA
@@ -113,7 +151,7 @@ function setupInspectionEvents(date) {
       alert(err?.message || "Không thể tải dữ liệu kiểm tra.");
     });
 
-  // ====== helpers ======
+  // ====== Modal helpers ======
   function openModal() {
     modal.style.display = "flex";
   }
@@ -121,6 +159,8 @@ function setupInspectionEvents(date) {
     modal.style.display = "none";
     clearForm();
   }
+
+  // ====== Form helpers ======
   function getVal(id) {
     return document.getElementById(id)?.value.trim() || "";
   }
@@ -140,6 +180,8 @@ function setupInspectionEvents(date) {
     setVal("ins-checker", row.children[3].textContent);
     setVal("ins-issue", row.children[4].textContent);
   }
+
+  // ====== Numbering ======
   function renumber() {
     [...tbody.querySelectorAll("tr")].forEach(
       (r, i) => (r.children[0].textContent = i + 1)
@@ -147,6 +189,7 @@ function setupInspectionEvents(date) {
     currentIndex = tbody.querySelectorAll("tr").length + 1;
   }
 
+  // ====== Row builders ======
   function makeRow(data, no) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -160,13 +203,14 @@ function setupInspectionEvents(date) {
     return tr;
   }
 
+  // ====== Action column (Edit/Delete) ======
   function appendActions(row) {
     if (row.querySelector("td.actions-col")) return;
     const td = document.createElement("td");
     td.className = "actions-col";
     td.innerHTML = `
-      <button  class="btn primary edit-btn" style="margin-right:8px; background:#43ff64d9; color:black; border-radius: 5px; border:none; height: 30px; width:50px">Edit</button>
-      <button class="btn primary delete-btn" style="margin-right:8px; background:red; color:black; border-radius: 5px; border:none; height: 30px; width:60px;">Delete</button>
+      <button class="btn primary edit-btn"   style="margin-right:8px; background:#43ff64d9; color:black; border-radius:5px; border:none; height:30px; width:50px">Edit</button>
+      <button class="btn primary delete-btn" style="margin-right:8px; background:red;          color:black; border-radius:5px; border:none; height:30px; width:60px;">Delete</button>
     `;
     row.appendChild(td);
 
@@ -184,9 +228,11 @@ function setupInspectionEvents(date) {
       }
     });
   }
+
   function removeActions() {
     tbody.querySelectorAll("td.actions-col").forEach((td) => td.remove());
   }
+
   function ensureHeaderActions(show) {
     const tr = document.querySelector(".table-report thead tr");
     const has = tr.querySelector("th.actions-col");
@@ -200,7 +246,7 @@ function setupInspectionEvents(date) {
     }
   }
 
-  // ====== update table when have no data ======
+  // ====== “No data” helper ======
   function updateNoDataRow() {
     const rows = tbody.querySelectorAll("tr");
     const noDataRow = tbody.querySelector(".no-data-row");
@@ -212,16 +258,19 @@ function setupInspectionEvents(date) {
         tr.innerHTML = `<td colspan="${colspan}" style="text-align:center; color:#999;">Không có dữ liệu</td>`;
         tbody.appendChild(tr);
       }
-    } else {
-      if (noDataRow) noDataRow.remove();
+    } else if (noDataRow) {
+      noDataRow.remove();
     }
   }
 
-  // ====== Edit mode state (dùng nút chung SPA để bật/tắt) ======
+  /* ===================== [PUBLIC API] ===================== */
+  // ——— Edit mode state ———
   let _editMode = false;
   function isEditMode() {
     return _editMode;
   }
+
+  // Public: bật/tắt edit mode (được gọi từ file khác, ví dụ report.js)
   window.__setInspectionEditMode = (enabled) => {
     _editMode = !!enabled;
     ensureHeaderActions(_editMode);
@@ -233,6 +282,7 @@ function setupInspectionEvents(date) {
       removeActions();
       ensureHeaderActions(false);
     }
+    updateNoDataRow();
   };
 
   // ====== gắn sự kiện cho nút chung “Thêm nội dung” ======
@@ -272,7 +322,12 @@ function setupInspectionEvents(date) {
   });
 }
 
-// ================== FETCH ==================
+/* ======================================================================
+ * [FETCH] — lấy dữ liệu từ server
+ * ----------------------------------------------------------------------
+ * - fetchJson(url)
+ * - fetchInspection(dateStr): ?date=YYYY-MM-DD hoặc ?all=true
+ * ==================================================================== */
 async function fetchJson(url) {
   const res = await fetch(url);
   if (!res.ok) {
@@ -300,7 +355,12 @@ async function fetchInspection(dateStr) {
     : [];
 }
 
-// ================== SUBMIT ==================
+/* ======================================================================
+ * [SUBMIT] — gửi dữ liệu bảng hiện tại
+ * ----------------------------------------------------------------------
+ * - API giữ nguyên: export async function submitInspectionReport(date)
+ * - Đọc dữ liệu trực tiếp từ tbody (kể cả khi có/không có cột thao tác)
+ * ==================================================================== */
 export async function submitInspectionReport(date) {
   const tbody = document.getElementById("inspection-tbody");
   if (!tbody) throw new Error("Không tìm thấy bảng kiểm tra thiết bị.");

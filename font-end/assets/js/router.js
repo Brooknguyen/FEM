@@ -1,6 +1,6 @@
 // router.js
-import { renderInfoRoute } from "./pages/info/index.js";
-import { renderPlanRoute } from "./pages/plan/index_plan.js";
+import { renderInfoRoute, setupInfoEvents } from "./pages/info/index.js";
+import { renderPlanRoute /* , setupPlanEvents */ } from "./pages/plan/index_plan.js";
 import { renderMaintenance, setupReportEvents } from "./pages/report/report.js";
 import { renderCrudInfoRoute } from "./pages/crud_info/crud.index.js";
 import { renderCrudPlanRoute } from "./pages/crud_plan/crud.index.plan.js";
@@ -35,6 +35,14 @@ function getUserRole() {
   }
 }
 
+// ===== NEW: quản lý vòng đời listeners search =====
+let searchController;
+function resetSearchBindings() {
+  if (searchController) searchController.abort();      // hủy listeners cũ
+  searchController = new AbortController();
+  return searchController.signal;                       // trả về signal mới
+}
+
 // helper: nhận string hoặc Promise<string>
 async function setHTML(el, maybeHTML) {
   el.innerHTML = await Promise.resolve(maybeHTML);
@@ -47,6 +55,9 @@ export async function renderRoute() {
   if (!main) return;
 
   const role = getUserRole();
+
+  // ===== NEW: tạo signal mới cho lần render này
+  const signal = resetSearchBindings();
 
   const isLogin = path === "/login";
   const isRegister = path === "/register";
@@ -93,6 +104,7 @@ export async function renderRoute() {
 
   if (path.startsWith("/info/")) {
     await setHTML(main, renderInfoRoute(path)); // future-proof nếu route async
+    setupInfoEvents({ signal });                // <-- dùng signal mới
     return;
   }
 
@@ -113,6 +125,8 @@ export async function renderRoute() {
 
   if (path.startsWith("/plan/")) {
     await setHTML(main, renderPlanRoute(path));
+    // Nếu sau này bạn có setupPlanEvents, hãy truyền signal giống Info:
+    // setupPlanEvents?.({ signal });
     return;
   }
 
@@ -133,13 +147,15 @@ export async function renderRoute() {
 
   if (path === "/report") {
     await setHTML(main, renderMaintenance());
-    setupReportEvents();
+    // Cho phép setupReportEvents nhận { signal } (không bắt buộc)
+    setupReportEvents?.({ signal });
     return;
   }
 
   if (path === "/todo") {
     await setHTML(main, renderTodoPage());
-    setupTodoEvents();
+    // Cho phép setupTodoEvents nhận { signal } (không bắt buộc)
+    setupTodoEvents?.({ signal });
     return;
   }
 
